@@ -29,7 +29,10 @@ if __name__ == "__main__":
     benchmark = RandomForestBenchmark(task_id=task_ids[0], seed=seed)
 
     # Create list of configs
-    configs = benchmark.get_config(size=n_configs)
+    config_list = benchmark.get_config(size=n_configs)
+    configs = {}
+    for config in config_list:
+        configs.update({config.__hash__(): config})
 
     # Create list of fidelities
     fidelity_grid = []
@@ -52,27 +55,32 @@ if __name__ == "__main__":
         grid_points = np.clip(grid_points, a_min=None, a_max=parameter.upper)
         fidelity_grid.append(grid_points)
     fidelity_grid = list(itertools.product(*fidelity_grid))
-    fidelities = []
+    fidelity_list = []
     for i, fidelity in enumerate(fidelity_grid):
         dummy_fidelity = benchmark.f_cs.sample_configuration()
         config = fidelity[-1]
         for j, parameter in enumerate(benchmark.f_cs.get_hyperparameters()):
             dummy_fidelity[parameter.name] = fidelity[j]
-        fidelities.append(dummy_fidelity)
+        fidelity_list.append(dummy_fidelity)
+
+    fidelities = {}
+    for f in fidelity_list:
+        fidelities.update({f.__hash__(): f})
 
     # all combinations of evaluations to be made
-    evaluations = list(itertools.product(*([task_ids, configs, fidelities])))
+    evaluations = list(itertools.product(
+        *([task_ids, list(configs.keys()), list(fidelities.keys())]))
+    )
 
     def loop_fn(evaluation):
-        task_id, config, fidelity = evaluation
+        task_id, config_hash, fidelity_hash = evaluation
         benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
         benchmark.load_data_automl()
-        # return {(task_id, config.__hash__(), fidelity.__hash__()): benchmark.objective(config, fidelity)}
         return {
             (task_id,
-             config.__hash__(),
-             fidelity.__hash__(),
-             seed): benchmark.objective(config, fidelity)
+             config_hash,
+             fidelity_hash,
+             seed): benchmark.objective(configs[config_hash], fidelities[fidelity_hash])
         }
 
     start = time.time()
