@@ -2,5 +2,5 @@ numpy
 pandas
 scikit-learn
 ConfigSpace
-itertools
+openml
 joblib
