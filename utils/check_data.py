@@ -4,8 +4,10 @@
 
 import sys
 import openml
+import numpy as np
 
-path = '/'.join(__file__.split('/')[:-1])
+
+path = '/'.join(__file__.split('/')[:-2])
 sys.path.append(path)
 from benchmark import RandomForestBenchmark
 
@@ -25,3 +27,4 @@ for i, task_id in enumerate(task_ids, start=1):
     except Exception as e:
         print(e)
         continue
+    print()
