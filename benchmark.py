@@ -172,8 +172,9 @@ class RandomForestBenchmark():
                 'train_loss': train_loss,
                 'test_loss': test_loss,
                 'cost': end - start,
-                'fidelity': fidelity,
-                'config': config
+                # storing as dictionary and not ConfigSpace saves tremendous memory
+                'fidelity': fidelity.get_dictionary(),
+                'config': config.get_dictionary()
             }
         }
 
@@ -188,17 +189,11 @@ class RandomForestBenchmark():
             random_state=self.rand_state
         )
         # no subsampling here
-        # train_idx = self.rand_state.choice(
-        #     np.arange(len(self.train_X)), size=int(
-        #         fidelity['subsample'] * len(self.train_X)
-        #     )
-        # )
         training_X = np.concatenate((self.train_X, self.valid_X), axis=0)
         training_y = np.concatenate((self.train_y, self.valid_y), axis=0)
         model.fit(training_X, training_y)
         accuracy_scorer = make_scorer(accuracy_score)
 
-        val_loss = 1 - accuracy_scorer(model, self.valid_X, self.valid_y)
         # TODO: should training loss be on the subsampled data ??
         train_loss = 1 - accuracy_scorer(model, training_X, training_y)
         test_loss = 1 - accuracy_scorer(model, self.test_X, self.test_y)
@@ -211,7 +206,8 @@ class RandomForestBenchmark():
             'info': {
                 'train_loss': train_loss,
                 'cost': end - start,
-                'fidelity': fidelity,
-                'config': config
+                # storing as dictionary and not ConfigSpace saves tremendous memory
+                'fidelity': fidelity.get_dictionary(),
+                'config': config.get_dictionary()
             }
         }
