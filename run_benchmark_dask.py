@@ -5,13 +5,16 @@ import numpy as np
 import ConfigSpace as CS
 from benchmark import RandomForestBenchmark
 
-from joblib import Parallel, delayed
+from dask.distributed import Client, wait
 
 
 if __name__ == "__main__":
 
     num_workers = int(sys.argv[1])
     print("Executing with {} worker(s)...".format(num_workers))
+    client = Client(n_workers=num_workers, processes=True, threads_per_worker=1)
+    total_compute_alloted = sum(client.nthreads().values())
+    print(client)
 
     task_ids = [
         3,       # kr-vs-kp
@@ -84,14 +87,43 @@ if __name__ == "__main__":
         }
 
     start = time.time()
-    with Parallel(n_jobs=num_workers) as parallel:
-        output = parallel(delayed(loop_fn)(evaluation) for evaluation in evaluations)
+    futures = []
+    run_history = []
+    total_wait = 0
+    for evaluation in evaluations:
+        done_futures = []
 
-    for i in range(len(output)):
-        results.update(output[i])
+        # adding new evaluation to be made
+        ### at this point the length of futures may become larger than total_compute_alloted
+        ### however, the number of incomplete tasks are always under total_compute_alloted
+        futures.append(client.submit(loop_fn, evaluation))
+
+        # maintain queue length as the total_compute_alloted available
+        if len(futures) > total_compute_alloted:
+            # wait till at least one future is released for the next evaluation
+            wait_start = time.time()
+            done_futures.extend(wait(futures, return_when='FIRST_COMPLETED').done)
+            total_wait += time.time() - wait_start
+        else:
+            done_futures.extend([f for f in futures if f.done()])
+
+        # storing result and clean up
+        for future in done_futures:
+            run_history.append(future.result())
+            futures.remove(future)
+
+    print("Gathering {} futures".format(len(futures)))
+    for i, result in enumerate(client.gather(futures), start=0):
+        print("{}/{}".format(i, len(futures)), end='\r')
+        run_history.append(result)
+
+    results = {}
+    for i in range(len(run_history)):
+        results.update(run_history[i])
 
     print("Time taken since beginning: {:<.5f} seconds".format(time.time() - start))
+    print("Total time spent waiting: {:<.5f} seconds".format(total_wait))
 
     import pickle
-    with open('results-joblib.pkl', 'wb') as f:
+    with open('results-dask.pkl', 'wb') as f:
         pickle.dump(results, f)

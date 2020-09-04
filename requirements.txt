@@ -4,3 +4,4 @@ scikit-learn
 ConfigSpace
 openml
 joblib
+dask[complete]
