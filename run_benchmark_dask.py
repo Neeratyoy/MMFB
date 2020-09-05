@@ -6,7 +6,10 @@ import ConfigSpace as CS
 from benchmark import RandomForestBenchmark
 
 from dask.distributed import Client, wait
+from dask.diagnostics import ProgressBar
 
+
+MAX_TASK_LIMIT_SIZE = 1000    # to have a load limit on number of futures done/pending kept in memory
 
 if __name__ == "__main__":
 
@@ -90,27 +93,38 @@ if __name__ == "__main__":
     futures = []
     run_history = []
     total_wait = 0
-    for evaluation in evaluations:
-        done_futures = []
 
-        # adding new evaluation to be made
-        ### at this point the length of futures may become larger than total_compute_alloted
-        ### however, the number of incomplete tasks are always under total_compute_alloted
-        futures.append(client.submit(loop_fn, evaluation))
+    pbar = ProgressBar()
+    pbar.register()
 
-        # maintain queue length as the total_compute_alloted available
-        if len(futures) > total_compute_alloted:
-            # wait till at least one future is released for the next evaluation
-            wait_start = time.time()
-            done_futures.extend(wait(futures, return_when='FIRST_COMPLETED').done)
-            total_wait += time.time() - wait_start
-        else:
-            done_futures.extend([f for f in futures if f.done()])
+    if len(evaluations) < MAX_TASK_LIMIT_SIZE:
+        futures = client.map(loop_fn, evaluations)
+        wait_start = time.time()
+        wait(futures, return_when='ALL_COMPLETED')
+        total_wait += time.time() - wait_start
+    else:
+        for evaluation in evaluations:
+            done_futures = []
 
-        # storing result and clean up
-        for future in done_futures:
-            run_history.append(future.result())
-            futures.remove(future)
+            # adding new evaluation to be made
+            ### at this point the length of futures may become larger than total_compute_alloted
+            ### however, the number of incomplete tasks are always under total_compute_alloted
+            futures.append(client.submit(loop_fn, evaluation))
+
+            # maintain queue length as the total_compute_alloted available
+            if len(futures) > MAX_TASK_LIMIT_SIZE:
+                # wait till at least one future is released for the next evaluation
+                wait_start = time.time()
+                done_futures.extend(wait(futures, return_when='FIRST_COMPLETED').done)
+                total_wait += time.time() - wait_start
+            else:
+                done_futures.extend([f for f in futures if f.done()])
+
+            # storing result and clean up
+            for future in done_futures:
+                run_history.append(future.result())
+                futures.remove(future)
+        # end of loop to distribute jobs
 
     print("Gathering {} futures".format(len(futures)))
     for i, result in enumerate(client.gather(futures), start=0):
@@ -127,3 +141,5 @@ if __name__ == "__main__":
     import pickle
     with open('results-dask.pkl', 'wb') as f:
         pickle.dump(results, f)
+
+    pbar.unregister()
