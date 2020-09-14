@@ -8,10 +8,13 @@ import numpy as np
 start = time.time()
 
 failed_removals = []
+deleted_files = []
 
-while (time.time() - start) < 300:
+while True:
 
     path = 'tmp_dump/'
+    if not os.path.isdir(path):
+        os.mkdir(path)
 
     file_list = os.listdir(path)
 
@@ -25,7 +28,7 @@ while (time.time() - start) < 300:
     # wait for a minute after the snapshot of files in directory
 
     print("\nSnapshot taken from directory --> {} files found!".format(len(file_list)))
-    time.sleep(30)
+    time.sleep(10)
 
     previous_task_id = None
     
@@ -33,7 +36,6 @@ while (time.time() - start) < 300:
     for i, filename in enumerate(file_list, start=1):
         print("{}/{}".format(i, len(file_list)), end='\r')
         if filename.split('_')[0] == 'task' or filename in failed_removals:
-            # print("Skipping {}".format(filename))
             continue
 
         with open(os.path.join(path, filename), 'rb') as f:
@@ -70,10 +72,11 @@ while (time.time() - start) < 300:
 
             with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
                 pickle.dump(main_data, f)
+        
+        os.remove(os.path.join(path, filename))
+
+    temp_file_list = os.listdir(path)
+    if len(temp_file_list) !=0 and all([file_name.split('_')[0] == 'task' for file_name in temp_file_list]):
+        break
             
-            try:
-                os.remove(os.path.join(path, filename))
-            except:
-                failed_removals.append(filename)
-            
-print("\n{} files were not deleted!".format(len(failed_removals)))
+print("Done!")

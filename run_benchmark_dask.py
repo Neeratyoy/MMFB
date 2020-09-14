@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     n_configs = 5
     fidelity_space_granularity = 5
-    n_seeds = 2
+    n_seeds = 4
     seeds = np.random.randint(1, 1000, size=n_seeds)
     results = {}
 
@@ -88,8 +88,7 @@ if __name__ == "__main__":
     evaluations = list(itertools.product(
         *([task_ids, list(configs.keys()), list(fidelities.keys()), list(path)])
     ))  #TODO: could be a large list so may want to process in batches
-
-    # print("\nEVALS: {}\n".format(evaluations[0]))
+    np.random.shuffle(evaluations)
 
     def loop_fn(evaluation):
         task_id, config_hash, fidelity_hash, path = evaluation
@@ -113,9 +112,6 @@ if __name__ == "__main__":
     futures = []
     run_history = []
     total_wait = 0
-
-    pbar = ProgressBar()
-    pbar.register()
 
     if len(evaluations) < MAX_TASK_LIMIT_SIZE:
         futures = client.map(loop_fn, evaluations)
@@ -155,14 +151,11 @@ if __name__ == "__main__":
 
     results = {}
     for i in range(len(run_history)):
-        print(run_history[i])
         results.update(run_history[i])
 
     print("Time taken since beginning: {:<.5f} seconds".format(time.time() - start))
     print("Total time spent waiting: {:<.5f} seconds".format(total_wait))
 
-    import pickle
-    with open('results-dask.pkl', 'wb') as f:
-        pickle.dump(results, f)
-
-    pbar.unregister()
+    # import pickle
+    # with open('results-dask.pkl', 'wb') as f:
+    #     pickle.dump(results, f)
