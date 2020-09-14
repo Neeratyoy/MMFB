@@ -1,5 +1,8 @@
+import os
 import sys
 import time
+import pickle
+import hashlib
 import itertools
 import numpy as np
 import ConfigSpace as CS
@@ -10,6 +13,11 @@ from dask.diagnostics import ProgressBar
 
 
 MAX_TASK_LIMIT_SIZE = 1000    # to have a load limit on number of futures done/pending kept in memory
+
+
+def config2hash(config):
+    return hashlib.md5(repr(config).encode('utf-8')).hexdigest()
+
 
 if __name__ == "__main__":
 
@@ -27,18 +35,19 @@ if __name__ == "__main__":
         # 9977     # nomao
     ]
 
-    seed = np.random.randint(1, 1000)
     n_configs = 5
     fidelity_space_granularity = 5
+    n_seeds = 2
+    seeds = np.random.randint(1, 1000, size=n_seeds)
     results = {}
 
-    benchmark = RandomForestBenchmark(task_id=task_ids[0], seed=seed)
+    benchmark = RandomForestBenchmark(task_id=task_ids[0], seed=seeds[0])
 
     # Create list of configs
     config_list = benchmark.get_config(size=n_configs)
     configs = {}
     for config in config_list:
-        configs.update({config.__hash__(): config})
+        configs.update({config2hash(config): config})
 
     # Create list of fidelities
     fidelity_grid = []
@@ -71,23 +80,34 @@ if __name__ == "__main__":
 
     fidelities = {}
     for f in fidelity_list:
-        fidelities.update({f.__hash__(): f})
+        fidelities.update({config2hash(f): f})
+
+    path = [os.path.join('/'.join(__file__.split('/')[:-1]), 'tmp_dump')]
 
     # all combinations of evaluations to be made
     evaluations = list(itertools.product(
-        *([task_ids, list(configs.keys()), list(fidelities.keys())]))
-    )
+        *([task_ids, list(configs.keys()), list(fidelities.keys()), list(path)])
+    ))  #TODO: could be a large list so may want to process in batches
+
+    # print("\nEVALS: {}\n".format(evaluations[0]))
 
     def loop_fn(evaluation):
-        task_id, config_hash, fidelity_hash = evaluation
-        benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
-        benchmark.load_data_automl()
-        return {
-            (task_id,
-             config_hash,
-             fidelity_hash,
-             seed): benchmark.objective(configs[config_hash], fidelities[fidelity_hash])
-        }
+        task_id, config_hash, fidelity_hash, path = evaluation
+        collated_result = {}
+        for seed in seeds:
+            benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
+            benchmark.load_data_automl()
+            result = {
+                (task_id,
+                 config_hash,
+                 fidelity_hash,
+                 seed): benchmark.objective(configs[config_hash], fidelities[fidelity_hash])
+            }
+            collated_result.update(result)
+        with open("{}/{}_{}_{}.pkl".format(path, task_id, config_hash, fidelity_hash), 'wb') as f:
+            pickle.dump(collated_result, f)
+        return [{}]
+        # return collated_result
 
     start = time.time()
     futures = []
@@ -122,17 +142,20 @@ if __name__ == "__main__":
 
             # storing result and clean up
             for future in done_futures:
-                run_history.append(future.result())
+                # run_history.append(future.result())
+                run_history.extend(future.result())
                 futures.remove(future)
         # end of loop to distribute jobs
 
     print("Gathering {} futures".format(len(futures)))
     for i, result in enumerate(client.gather(futures), start=0):
         print("{}/{}".format(i, len(futures)), end='\r')
-        run_history.append(result)
+        # run_history.append(result)
+        run_history.extend(result)
 
     results = {}
     for i in range(len(run_history)):
+        print(run_history[i])
         results.update(run_history[i])
 
     print("Time taken since beginning: {:<.5f} seconds".format(time.time() - start))
