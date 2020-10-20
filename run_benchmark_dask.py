@@ -12,10 +12,15 @@ from dask.distributed import Client, wait
 from dask.diagnostics import ProgressBar
 
 
-MAX_TASK_LIMIT_SIZE = 1000    # to have a load limit on number of futures done/pending kept in memory
+MAX_TASK_LIMIT_SIZE = 1000  # to have a load limit on number of futures done/pending kept in memory
 
 
 def config2hash(config):
+    """ Generate md5 hash to distinguish and look up configurations
+
+    :param config:
+    :return:
+    """
     return hashlib.md5(repr(config).encode('utf-8')).hexdigest()
 
 
@@ -27,6 +32,8 @@ if __name__ == "__main__":
     total_compute_alloted = sum(client.nthreads().values())
     print(client)
 
+    # sample tasks
+    # TODO: decide properly
     task_ids = [
         3,       # kr-vs-kp
         # 168335,  # MiniBooNE   ### why failed???
@@ -35,23 +42,26 @@ if __name__ == "__main__":
         # 9977     # nomao
     ]
 
-    n_configs = 5
-    fidelity_space_granularity = 5
-    n_seeds = 4
-    seeds = np.random.randint(1, 1000, size=n_seeds)
+    n_configs = 5  # number of configurations to be evaluated
+    fidelity_space_granularity = 5  # the number of partitions of each fidelity dimension
+    n_seeds = 4  # number of seeds each config-fidelity will be evaluated
+    seeds = np.random.randint(1, 1000, size=n_seeds)  # each run will collect for different seeds
     results = {}
 
+    # placeholder initialisation with one of the tasks
     benchmark = RandomForestBenchmark(task_id=task_ids[0], seed=seeds[0])
 
     # Create list of configs
     config_list = benchmark.get_config(size=n_configs)
     configs = {}
+    # storing a fixed 'n_configs' set that will be evaluated across all task IDs
     for config in config_list:
         configs.update({config2hash(config): config})
 
-    # Create list of fidelities
+    # create list of fidelities
     fidelity_grid = []
-    eps = 1e-10
+    eps = 1e-10  # to allow the < 'upper' parameter of np.arange to select 'parameter.upper'
+    # 'benchmark.f_cs' contains list of fidelities (2 or more)
     for i, parameter in enumerate(benchmark.f_cs.get_hyperparameters()):
         if isinstance(parameter, CS.UniformIntegerHyperparameter) and \
                 (parameter.upper - parameter.lower) < fidelity_space_granularity:
@@ -59,7 +69,7 @@ if __name__ == "__main__":
         else:
             step = (parameter.upper - parameter.lower) / \
                    (fidelity_space_granularity - 1)
-
+        # creates a sequence of points on a fidelity dimensions spanning the range
         grid_points = np.arange(
             start=parameter.lower, stop=parameter.upper + eps, step=step
         )
@@ -69,8 +79,10 @@ if __name__ == "__main__":
 
         grid_points = np.clip(grid_points, a_min=None, a_max=parameter.upper)
         fidelity_grid.append(grid_points)
+
+    # creates a grid of all combinations of divisions of each fidelity dimension (fidelity_grid)
     fidelity_grid = list(itertools.product(*fidelity_grid))
-    fidelity_list = []
+    fidelity_list = []  # to store all combinations of the fidelity space as ConfigSpace
     for i, fidelity in enumerate(fidelity_grid):
         dummy_fidelity = benchmark.f_cs.sample_configuration()
         config = fidelity[-1]
@@ -79,23 +91,27 @@ if __name__ == "__main__":
         fidelity_list.append(dummy_fidelity)
 
     fidelities = {}
+    # storing a fixed 'fidelity_list' that will be used to evaluate all configs across all tasks
     for f in fidelity_list:
         fidelities.update({config2hash(f): f})
 
     path = [os.path.join('/'.join(__file__.split('/')[:-1]), 'tmp_dump')]
 
     # all combinations of evaluations to be made
+    # len(evaluations) = n_configs * fidelity_granularity * n_fidelities
     evaluations = list(itertools.product(
         *([task_ids, list(configs.keys()), list(fidelities.keys()), list(path)])
     ))  #TODO: could be a large list so may want to process in batches
     np.random.shuffle(evaluations)
 
+    # function to be submitted to workers for evaluation
     def loop_fn(evaluation):
         task_id, config_hash, fidelity_hash, path = evaluation
         collated_result = {}
         for seed in seeds:
             benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
             benchmark.load_data_automl()
+            # the lookup dict key for each evaluation is a 4-element tuple
             result = {
                 (task_id,
                  config_hash,
@@ -103,16 +119,17 @@ if __name__ == "__main__":
                  seed): benchmark.objective(configs[config_hash], fidelities[fidelity_hash])
             }
             collated_result.update(result)
+        # file_collator should collect the pickle files dumped below
         with open("{}/{}_{}_{}.pkl".format(path, task_id, config_hash, fidelity_hash), 'wb') as f:
             pickle.dump(collated_result, f)
         return [{}]
-        # return collated_result
 
     start = time.time()
     futures = []
     run_history = []
     total_wait = 0
 
+    # submitting jobs to Dask
     if len(evaluations) < MAX_TASK_LIMIT_SIZE:
         futures = client.map(loop_fn, evaluations)
         wait_start = time.time()
@@ -155,7 +172,3 @@ if __name__ == "__main__":
 
     print("Time taken since beginning: {:<.5f} seconds".format(time.time() - start))
     print("Total time spent waiting: {:<.5f} seconds".format(total_wait))
-
-    # import pickle
-    # with open('results-dask.pkl', 'wb') as f:
-    #     pickle.dump(results, f)
