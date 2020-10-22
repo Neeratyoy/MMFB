@@ -1,14 +1,7 @@
 import os
 import time
-import json
 import pickle
-import numpy as np
 
-
-start = time.time()
-
-failed_removals = []
-deleted_files = []
 
 while True:
 
@@ -16,16 +9,8 @@ while True:
     if not os.path.isdir(path):
         os.mkdir(path)
 
+    # collect all files in the directoe
     file_list = os.listdir(path)
-
-    # all_results = {}
-    # for filename in file_list:
-    #     with open(os.path.join(path, filename), 'rb') as f:
-    #         res = pickle.load(f)
-    #     if filename.split('_')[0] != 'task':
-    #         all_results.update(res)
-
-    # wait for a minute after the snapshot of files in directory
 
     print("\nSnapshot taken from directory --> {} files found!".format(len(file_list)))
     time.sleep(10)
@@ -35,7 +20,8 @@ while True:
     print("Starting collection...")
     for i, filename in enumerate(file_list, start=1):
         print("{}/{}".format(i, len(file_list)), end='\r')
-        if filename.split('_')[0] == 'task' or filename in failed_removals:
+        # ignore files that are named as 'task_x.pkl'
+        if filename.split('_')[0] == 'task':
             continue
 
         with open(os.path.join(path, filename), 'rb') as f:
@@ -43,6 +29,11 @@ while True:
 
         for k, v in res.items():
             task_id, config_hash, fidelity_hash, seed = k
+            # structure of how records are saved to disk to allow quick lookups
+            # the parent key is given by the task_id
+            # each task will have a list of configurations stored with their md5 hash
+            # each config under each task will have all the fidelities it was evaluated on
+            # each task-config-fidelity would have been evaluated on a different seed
             obj = {
                 task_id: {
                     config_hash: {
@@ -52,6 +43,7 @@ while True:
                     }
                 }
             }
+            # if no data for this task_id seen yet, create file
             if not os.path.isfile(os.path.join(path, "task_{}.pkl".format(task_id))):
                 # create the file
                 with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
@@ -60,7 +52,8 @@ while True:
 
             with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'rb') as f:
                 main_data = pickle.load(f)
-            
+
+            # find the right level in the dict hierarchy to append new data
             if config_hash not in main_data[task_id].keys():
                 main_data[task_id].update(obj[task_id])
             elif fidelity_hash not in main_data[task_id][config_hash].keys():
@@ -70,12 +63,14 @@ while True:
             else:
                 raise Exception("Collision!")
 
+            # updating file for the task_id
             with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
                 pickle.dump(main_data, f)
         
-        os.remove(os.path.join(path, filename))
+        os.remove(os.path.join(path, filename))  # deleting file that was appended to task data
 
-    temp_file_list = os.listdir(path)
+    temp_file_list = os.listdir(path)  # current snapshot of directory
+    # break/terminate file collection if only files remaining in the directory are task data files
     if len(temp_file_list) !=0 and all([file_name.split('_')[0] == 'task' for file_name in temp_file_list]):
         break
             

@@ -24,8 +24,17 @@ class RandomForestBenchmark():
         self.rand_state = check_random_state(self.seed)
         self.cs = self.get_param_space()
         self.f_cs = self.get_fidelity_space()
+        # data variables
+        self.train_X = None
+        self.valid_X = None
+        self.test_X = None
+        self.train_y = None
+        self.valid_y = None
+        self.test_y = None
 
     def get_param_space(self):
+        """Parameter space to be optimized --- contains the hyperparameters
+        """
         cs = CS.ConfigurationSpace(seed=self.seed)
 
         cs.add_hyperparameters([
@@ -36,16 +45,18 @@ class RandomForestBenchmark():
             CS.UniformFloatHyperparameter('max_features', lower=0.01, upper=0.99,
                                           default_value=0.33, log=True),
             # TODO: check variance in performance with these parameters included
-            # CS.UniformFloatHyperparameter('min_samples_leaf', lower=0.01,
-            #                                upper=0.49, default_value=0.01, log=True),
-            # CS.UniformFloatHyperparameter('min_weight_fraction_leaf', lower=0.01,
-            #                                upper=0.49, default_value=0.01, log=True),
-            # CS.UniformFloatHyperparameter('min_impurity_decrease', lower=0.0,
-            #                                upper=0.5, default_value=0.0, log=False)
+            CS.UniformFloatHyperparameter('min_samples_leaf', lower=0.01,
+                                           upper=0.49, default_value=0.01, log=True),
+            CS.UniformFloatHyperparameter('min_weight_fraction_leaf', lower=0.01,
+                                           upper=0.49, default_value=0.01, log=True),
+            CS.UniformFloatHyperparameter('min_impurity_decrease', lower=0.0,
+                                           upper=0.5, default_value=0.0, log=False)
         ])
         return cs
 
     def get_fidelity_space(self):
+        """Fidelity space available --- specifies the fidelity dimensions
+        """
         f_cs = CS.ConfigurationSpace(seed=self.seed)
 
         f_cs.add_hyperparameters([
@@ -57,24 +68,28 @@ class RandomForestBenchmark():
         return f_cs
 
     def get_config(self, size=None):
-        if size is None:
+        """Samples configuration(s) from the (hyper) parameter space
+        """
+        if size is None:  # return only one config
             return self.cs.sample_configuration()
         return [self.cs.sample_configuration() for i in range(size)]
 
     def get_fidelity(self, size=None):
-        if size is None:
+        """Samples candidate fidelities from the fidelity space
+        """
+        if size is None:  # return only one config
             return self.f_cs.sample_configuration()
         return [self.f_cs.sample_configuration() for i in range(size)]
 
     def load_data_automl(self, verbose=False):
+        """Fetches data from OpenML and initializes the train-validation-test data splits
+        """
 
         # loads AutoML benchmark
         self.automl_benchmark = openml.study.get_suite(218)
-        # if self.task_id is None:
-        #     self.task_id = self.automl_benchmark.tasks[
-        #         np.random.randint(len(automl_benchmark.tasks))
-        #     ]
+        # fetches task
         self.task = openml.tasks.get_task(self.task_id, download_data=False)
+        # fetches dataset
         self.dataset = openml.datasets.get_dataset(self.task.dataset_id, download_data=False)
         if verbose:
             print(self.task, '\n')
@@ -89,6 +104,7 @@ class RandomForestBenchmark():
         (cont_idx,) = np.where(~categorical_ind)
 
         # splitting dataset into train and test (10% test)
+        # train-test split is fixed for a task and its associated dataset
         train_idx, test_idx = self.task.get_train_test_split_indices()
         train_X = X.iloc[train_idx]
         train_y = y.iloc[train_idx]
@@ -97,9 +113,9 @@ class RandomForestBenchmark():
 
         # splitting training into training and validation
         self.train_X, self.valid_X, self.train_y, self.valid_y = train_test_split(
-            train_X, train_y, test_size=self.valid_size,
+            train_X, train_y, test_size=self.valid_size,  # validation size set in __init__()
             shuffle=True, stratify=train_y, random_state=self.rand_state
-        )
+        )  # validation set is fixed till this function is called again or explicitly altered
 
         # preprocessor to handle missing values, categorical columns encodings,
         #   and scaling numeric columns
@@ -120,10 +136,12 @@ class RandomForestBenchmark():
                 )
             ])
         )
-        # preprocessing the training set
+
         if verbose:
             print("Shape of data pre-preprocessing: {}".format(train_X.shape))
+        # preprocessor fit only on the training set
         self.train_X = self.preprocessor.fit_transform(self.train_X)
+        # aaplying preprocessor built on the training set, across validation and test splits
         self.valid_X = self.preprocessor.transform(self.valid_X)
         self.test_X = self.preprocessor.transform(self.test_X)
         if verbose:
@@ -136,25 +154,26 @@ class RandomForestBenchmark():
                                                             self.valid_y.shape))
             print("Test data (X, y): ({}, {})".format(self.test_X.shape,
                                                       self.test_y.shape))
-
             print("\nData loading complete!\n")
 
-    def objective(self, config, fidelity):
+    def _objective(self, config, fidelity):
         start = time.time()
 
+        # initializing model
         model = RandomForestClassifier(
             **config.get_dictionary(),
-            n_estimators=fidelity['n_estimators'],
-            # max_samples=fidelities['subsample'],
+            n_estimators=fidelity['n_estimators'],  # a fidelity being used during initialization
             bootstrap=True,
             random_state=self.rand_state
         )
         # subsample here
+        # application of the other fidelity to the dataset that the model interfaces
         train_idx = self.rand_state.choice(
             np.arange(len(self.train_X)), size=int(
                 fidelity['subsample'] * len(self.train_X)
             )
         )
+        # fitting the model with subsampled data
         model.fit(self.train_X[train_idx], self.train_y.iloc[train_idx])
         accuracy_scorer = make_scorer(accuracy_score)
 
@@ -167,47 +186,31 @@ class RandomForestBenchmark():
         end = time.time()
 
         return {
-            'function_value': val_loss,
-            'info': {
-                'train_loss': train_loss,
-                'test_loss': test_loss,
-                'cost': end - start,
-                # storing as dictionary and not ConfigSpace saves tremendous memory
-                'fidelity': fidelity.get_dictionary(),
-                'config': config.get_dictionary()
-            }
+            'train_loss': train_loss,
+            'test_loss': test_loss,
+            'val_loss': val_loss,
+            'cost': end - start,
+            # storing as dictionary and not ConfigSpace saves tremendous memory
+            'fidelity': fidelity.get_dictionary(),
+            'config': config.get_dictionary()
+        }
+
+    def objective(self, config, fidelity):
+        """Function that evaluates a 'config' on a 'fidelity' on the validation set
+        """
+        info = self._objective(config, fidelity)
+
+        return {
+            'function_value': info['val_loss'],
+            'info': info
         }
 
     def objective_test(self, config, fidelity):
-        start = time.time()
-
-        model = RandomForestClassifier(
-            **config.get_dictionary(),
-            n_estimators=fidelity['n_estimators'],
-            # max_samples=fidelities['subsample'],
-            bootstrap=True,
-            random_state=self.rand_state
-        )
-        # no subsampling here
-        training_X = np.concatenate((self.train_X, self.valid_X), axis=0)
-        training_y = np.concatenate((self.train_y, self.valid_y), axis=0)
-        model.fit(training_X, training_y)
-        accuracy_scorer = make_scorer(accuracy_score)
-
-        # TODO: should training loss be on the subsampled data ??
-        train_loss = 1 - accuracy_scorer(model, training_X, training_y)
-        test_loss = 1 - accuracy_scorer(model, self.test_X, self.test_y)
-
-        del model
-        end = time.time()
+        """Function that evaluates a 'config' on a 'fidelity' on the test set
+        """
+        info = self._objective(config, fidelity)
 
         return {
-            'function_value': test_loss,
-            'info': {
-                'train_loss': train_loss,
-                'cost': end - start,
-                # storing as dictionary and not ConfigSpace saves tremendous memory
-                'fidelity': fidelity.get_dictionary(),
-                'config': config.get_dictionary()
-            }
+            'function_value': info['test_loss'],
+            'info': info
         }

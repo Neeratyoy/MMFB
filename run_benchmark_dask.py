@@ -17,9 +17,6 @@ MAX_TASK_LIMIT_SIZE = 1000  # to have a load limit on number of futures done/pen
 
 def config2hash(config):
     """ Generate md5 hash to distinguish and look up configurations
-
-    :param config:
-    :return:
     """
     return hashlib.md5(repr(config).encode('utf-8')).hexdigest()
 
@@ -97,18 +94,21 @@ if __name__ == "__main__":
 
     path = [os.path.join('/'.join(__file__.split('/')[:-1]), 'tmp_dump')]
 
+    # one of the most crucial steps since it collects all possible jobs that will be scheduled
     # all combinations of evaluations to be made
     # len(evaluations) = n_configs * fidelity_granularity * n_fidelities
     evaluations = list(itertools.product(
         *([task_ids, list(configs.keys()), list(fidelities.keys()), list(path)])
     ))  #TODO: could be a large list so may want to process in batches
     np.random.shuffle(evaluations)
+    # 'evaluations' contains a randomly ordered list where each element will be submitted to a
+    # worker informing it of the task_id to run on, the configuration to evaluate and the fidelity
 
     # function to be submitted to workers for evaluation
     def loop_fn(evaluation):
         task_id, config_hash, fidelity_hash, path = evaluation
         collated_result = {}
-        for seed in seeds:
+        for seed in seeds:  # seeds available in the scope
             benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
             benchmark.load_data_automl()
             # the lookup dict key for each evaluation is a 4-element tuple
@@ -163,7 +163,6 @@ if __name__ == "__main__":
     print("Gathering {} futures".format(len(futures)))
     for i, result in enumerate(client.gather(futures), start=0):
         print("{}/{}".format(i, len(futures)), end='\r')
-        # run_history.append(result)
         run_history.extend(result)
 
     results = {}
@@ -172,3 +171,5 @@ if __name__ == "__main__":
 
     print("Time taken since beginning: {:<.5f} seconds".format(time.time() - start))
     print("Total time spent waiting: {:<.5f} seconds".format(total_wait))
+    print("Total number of jobs submitted: {}".format(len(evaluations)))
+    print("Total number of results logged: {}".format(len(run_history)))
