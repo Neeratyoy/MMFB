@@ -36,7 +36,7 @@ if __name__ == "__main__":
         # 168335,  # MiniBooNE   ### why failed???
         # 168331,  # volkert
         31,      # credit-g
-        9977     # nomao
+        # 9977     # nomao
     ]
 
     n_configs = 5  # number of configurations to be evaluated
