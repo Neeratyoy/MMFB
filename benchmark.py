@@ -45,12 +45,12 @@ class RandomForestBenchmark():
             CS.UniformFloatHyperparameter('max_features', lower=0.01, upper=0.99,
                                           default_value=0.33, log=True),
             # TODO: check variance in performance with these parameters included
-            CS.UniformFloatHyperparameter('min_samples_leaf', lower=0.01,
-                                           upper=0.49, default_value=0.01, log=True),
-            CS.UniformFloatHyperparameter('min_weight_fraction_leaf', lower=0.01,
-                                           upper=0.49, default_value=0.01, log=True),
-            CS.UniformFloatHyperparameter('min_impurity_decrease', lower=0.0,
-                                           upper=0.5, default_value=0.0, log=False)
+            # CS.UniformFloatHyperparameter('min_samples_leaf', lower=0.01,
+            #                                upper=0.49, default_value=0.01, log=True),
+            # CS.UniformFloatHyperparameter('min_weight_fraction_leaf', lower=0.01,
+            #                                upper=0.49, default_value=0.01, log=True),
+            # CS.UniformFloatHyperparameter('min_impurity_decrease', lower=0.0,
+            #                                upper=0.5, default_value=0.0, log=False)
         ])
         return cs
 
