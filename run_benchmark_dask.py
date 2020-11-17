@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     num_workers = int(sys.argv[1])
     print("Executing with {} worker(s)...".format(num_workers))
-    client = Client(n_workers=num_workers, processes=True, threads_per_worker=1)
+    client = Client(n_workers=num_workers, processes=False, threads_per_worker=1)
     total_compute_alloted = sum(client.nthreads().values())
     print(client)
 
