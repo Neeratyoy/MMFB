@@ -13,10 +13,11 @@ if __name__ == "__main__":
         if not os.path.isdir(path):
             os.mkdir(path)
 
-        # collect all files in the directoe
+        # collect all files in the directory
         file_list = os.listdir(path)
-
         print("\nSnapshot taken from directory --> {} files found!".format(len(file_list)))
+
+        # sleep to allow disk writes to be completed for the collected file names
         time.sleep(sleep_wait)
 
         previous_task_id = None

@@ -60,16 +60,19 @@ if __name__ == "__main__":
     eps = 1e-10  # to allow the < 'upper' parameter of np.arange to select 'parameter.upper'
     # 'benchmark.f_cs' contains list of fidelities (2 or more)
     for i, parameter in enumerate(benchmark.f_cs.get_hyperparameters()):
+        upper, lower = (10 ** parameter.upper, 10 ** parameter.lower) if parameter.log \
+            else (parameter.upper, parameter.lower)
         if isinstance(parameter, CS.UniformIntegerHyperparameter) and \
-                (parameter.upper - parameter.lower) < fidelity_space_granularity:
+                (upper - lower) < fidelity_space_granularity:
             step = 1
         else:
-            step = (parameter.upper - parameter.lower) / \
-                   (fidelity_space_granularity - 1)
+            step = (upper - lower) / (fidelity_space_granularity - 1)
         # creates a sequence of points on a fidelity dimensions spanning the range
         grid_points = np.arange(
-            start=parameter.lower, stop=parameter.upper + eps, step=step
+            start=lower, stop=upper + eps, step=step
         )
+        if parameter.log:
+            grid_points = np.log10(grid_points)
 
         if isinstance(parameter, CS.UniformIntegerHyperparameter):
             grid_points = np.ceil(grid_points).astype(int)
@@ -82,7 +85,6 @@ if __name__ == "__main__":
     fidelity_list = []  # to store all combinations of the fidelity space as ConfigSpace
     for i, fidelity in enumerate(fidelity_grid):
         dummy_fidelity = benchmark.f_cs.sample_configuration()
-        config = fidelity[-1]
         for j, parameter in enumerate(benchmark.f_cs.get_hyperparameters()):
             dummy_fidelity[parameter.name] = fidelity[j]
         fidelity_list.append(dummy_fidelity)
@@ -168,6 +170,8 @@ if __name__ == "__main__":
     results = {}
     for i in range(len(run_history)):
         results.update(run_history[i])
+
+    client.close()
 
     print("Time taken since beginning: {:<.5f} seconds".format(time.time() - start))
     print("Total time spent waiting: {:<.5f} seconds".format(total_wait))

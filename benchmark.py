@@ -22,8 +22,8 @@ class RandomForestBenchmark():
         self.valid_size = valid_size
         self.seed = seed
         self.rand_state = check_random_state(self.seed)
-        self.cs = self.get_param_space()
         self.f_cs = self.get_fidelity_space()
+        self.cs = self.get_param_space()
         # data variables
         self.train_X = None
         self.valid_X = None
@@ -38,19 +38,18 @@ class RandomForestBenchmark():
         cs = CS.ConfigurationSpace(seed=self.seed)
 
         cs.add_hyperparameters([
-            CS.UniformIntegerHyperparameter('max_depth', lower=1, upper=15,
-                                            default_value=5, log=False),
-            CS.UniformFloatHyperparameter('min_samples_split', lower=0.01,
-                                          upper=0.99, default_value=0.01, log=True),
-            CS.UniformFloatHyperparameter('max_features', lower=0.01, upper=0.99,
-                                          default_value=0.33, log=True),
-            # TODO: check variance in performance with these parameters included
-            # CS.UniformFloatHyperparameter('min_samples_leaf', lower=0.01,
-            #                                upper=0.49, default_value=0.01, log=True),
-            # CS.UniformFloatHyperparameter('min_weight_fraction_leaf', lower=0.01,
-            #                                upper=0.49, default_value=0.01, log=True),
-            # CS.UniformFloatHyperparameter('min_impurity_decrease', lower=0.0,
-            #                                upper=0.5, default_value=0.0, log=False)
+            CS.UniformIntegerHyperparameter(
+                'max_depth', lower=1, upper=15, default_value=5, log=False
+            ),
+            CS.UniformFloatHyperparameter(
+                'min_samples_split', lower=2, upper=128, default_value=2, log=True
+            ),
+            CS.UniformFloatHyperparameter(
+                'max_features', lower=0.1, upper=0.9, default_value=0.5, log=False
+            ),
+            CS.UniformFloatHyperparameter(
+                'min_samples_leaf', lower=1, upper=64, default_value=1, log=True
+            ),
         ])
         return cs
 
@@ -124,8 +123,7 @@ class RandomForestBenchmark():
                 (
                     "cat",
                     make_pipeline(SimpleImputer(strategy="most_frequent"),
-                                  OneHotEncoder(sparse=False,
-                                                handle_unknown="ignore")),
+                                  OneHotEncoder(sparse=False, handle_unknown="ignore")),
                     cat_idx.tolist(),
                 ),
                 (
