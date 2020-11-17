@@ -39,15 +39,15 @@ class RandomForestBenchmark():
 
         cs.add_hyperparameters([
             CS.UniformIntegerHyperparameter(
-                'max_depth', lower=1, upper=15, default_value=5, log=False
+                'max_depth', lower=1, upper=15, default_value=2, log=False
             ),
-            CS.UniformFloatHyperparameter(
+            CS.UniformIntegerHyperparameter(
                 'min_samples_split', lower=2, upper=128, default_value=2, log=True
             ),
             CS.UniformFloatHyperparameter(
                 'max_features', lower=0.1, upper=0.9, default_value=0.5, log=False
             ),
-            CS.UniformFloatHyperparameter(
+            CS.UniformIntegerHyperparameter(
                 'min_samples_leaf', lower=1, upper=64, default_value=1, log=True
             ),
         ])
