@@ -22,8 +22,8 @@ class RandomForestBenchmark():
         self.valid_size = valid_size
         self.seed = seed
         self.rand_state = check_random_state(self.seed)
-        self.f_cs = self.get_fidelity_space()
-        self.cs = self.get_param_space()
+        self.z_cs = self.get_fidelity_space()
+        self.x_cs = self.get_param_space()
         # data variables
         self.train_X = None
         self.valid_X = None
@@ -70,8 +70,8 @@ class RandomForestBenchmark():
         """Samples configuration(s) from the (hyper) parameter space
         """
         if size is None:  # return only one config
-            return self.cs.sample_configuration()
-        return [self.cs.sample_configuration() for i in range(size)]
+            return self.x_cs.sample_configuration()
+        return [self.x_cs.sample_configuration() for i in range(size)]
 
     def get_fidelity(self, size=None):
         """Samples candidate fidelities from the fidelity space
@@ -82,10 +82,9 @@ class RandomForestBenchmark():
 
     def load_data_automl(self, verbose=False):
         """Fetches data from OpenML and initializes the train-validation-test data splits
-        """
 
-        # loads AutoML benchmark
-        self.automl_benchmark = openml.study.get_suite(218)
+        The validation set is fixed till this function is called again or explicitly altered
+        """
         # fetches task
         self.task = openml.tasks.get_task(self.task_id, download_data=False)
         # fetches dataset

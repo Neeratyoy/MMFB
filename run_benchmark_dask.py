@@ -1,18 +1,16 @@
 import os
-import sys
 import time
+import openml
 import pickle
 import hashlib
+import argparse
 import itertools
 import numpy as np
-import ConfigSpace as CS
+from distributed import Client
+from multiprocessing.managers import BaseManager
+
 from benchmark import RandomForestBenchmark
-
-from dask.distributed import Client, wait
-from dask.diagnostics import ProgressBar
-
-
-MAX_TASK_LIMIT_SIZE = 1000  # to have a load limit on number of futures done/pending kept in memory
+from utils.util import get_parameter_grid
 
 
 def config2hash(config):
@@ -21,159 +19,224 @@ def config2hash(config):
     return hashlib.md5(repr(config).encode('utf-8')).hexdigest()
 
 
+def return_dict(combination):
+    assert len(combination) == 5
+    evaluation = dict()
+    evaluation["task_id"] = combination[0]
+    evaluation["config"] = combination[1]
+    evaluation["fidelity"] = combination[2]
+    evaluation["seed"] = combination[3]
+    evaluation["path"] = combination[4]
+    return evaluation
+
+
+def compute(evaluation: dict, benchmarks: dict=None) -> str:
+    """ Function to evaluate a configuration-fidelity on a task for a seed
+
+    Parameters
+    ----------
+    evaluation : dict
+        5-element dictionary containing all information required to perform a run
+    benchmarks : dict
+        a nested dictionary of the hierarchy task_id-seeds containing instantiations of the
+        benchmarks for each task_id - seed pair that is shared across all Dask workers
+    """
+    task_id = evaluation["task_id"]
+    config = evaluation["config"]
+    config_hash = config2hash(config)
+    fidelity = evaluation["fidelity"]
+    fidelity_hash = config2hash(fidelity)
+    seed = evaluation["seed"]
+    path = evaluation["path"]
+
+    if benchmarks is None:
+        benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
+    else:
+        benchmark = benchmarks[task_id][seed]
+    # the lookup dict key for each evaluation is a 4-element tuple
+    result = {
+        (task_id,
+         config2hash(config),
+         config2hash(fidelity),
+         seed): benchmark.objective(config, fidelity)
+    }
+    # file_collator should collect the pickle files dumped below
+    name = "{}/{}_{}_{}_{}.pkl".format(path, task_id, config_hash, fidelity_hash, seed)
+    with open(name, 'wb') as f:
+        pickle.dump(result, f)
+    return "success"
+
+
+class DaskHelper:
+    def __init__(self, n_workers):
+        self.n_workers = n_workers
+        self.client = Client(
+            n_workers=self.n_workers,
+            processes=True,
+            threads_per_worker=1,
+            scheduler_port=0
+        )
+        self.futures = []
+        self.shared_data = None
+
+    def __getstate__(self):
+        """ Allows the object to picklable while having Dask client as a class attribute.
+        """
+        d = dict(self.__dict__)
+        d["client"] = None  # hack to allow Dask client to be a class attribute
+        return d
+
+    def __del__(self):
+        """ Ensures a clean kill of the Dask client and frees up a port.
+        """
+        if hasattr(self, "client") and isinstance(self, Client):
+            self.client.close()
+
+    def submit_job(self, func, x):
+        if self.shared_data is not None:
+            self.futures.append(self.client.submit(func, x, self.shared_data))
+        else:
+            self.futures.append(self.client.submit(func, x))
+
+    def is_worker_available(self, verbose=False):
+        """ Checks if at least one worker is available to run a job
+        """
+        if self.n_workers == 1:
+            # in the synchronous case, one worker is always available
+            return True
+        workers = sum(self.client.nthreads().values())
+        if len(self.futures) >= workers:
+            # pause/wait if active worker count greater allocated workers
+            return False
+        return True
+
+    def fetch_futures(self, retries=1, wait_time=0.05):
+        """ Removes the futures which are done from the list
+
+        Loops over the list a given number of times, waiting for a given time, to check if any or
+        more futures have finished. If at any time, all futures have been processed, it breaks out.
+        """
+        counter = 0
+        while counter < retries:
+            if self.n_workers > 1:
+                self.futures = [future for future in self.futures if not future.done()]
+                if len(self.futures) == 0:
+                    break
+            else:
+                # Dask not invoked in the synchronous case (n_workers=1)
+                self.futures = []
+            time.sleep(wait_time)
+            counter += 1
+        return None
+
+    def distribute_data_to_workers(self, data):
+        self.shared_data = self.client.scatter(data, broadcast=True)
+
+
+def input_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--n_tasks",
+        default=3,
+        type=int,
+        help="The number of tasks to run data collection on from the AutoML benchmark suite"
+    )
+    parser.add_argument(
+        "--x_grid_size",
+        default=10,
+        type=int,
+        help="The size of grid steps to split each dimension of the observation space. For a "
+             "parameter with range [0, 20] and step size of 10, the resultant grid would be "
+             "[0, 2.22, 4.44, ..., 17.78, 20], using numpy.linspace."
+    )
+    parser.add_argument(
+        "--z_grid_size",
+        default=10,
+        type=int,
+        help="The size of grid steps to split each dimension of the fidelity space. For a "
+             "parameter with range [0, 20] and step size of 10, the resultant grid would be "
+             "[0, 2.22, 4.44, ..., 17.78, 20], using numpy.linspace."
+    )
+    parser.add_argument(
+        "--n_seeds",
+        default=4,
+        type=int,
+        help="The number of different seeds to evaluate each configuration-fidelity on."
+    )
+    parser.add_argument(
+        "--n_workers",
+        default=1,
+        type=int,
+        help="The number of workers to distribute the evaluation over."
+    )
+    parser.add_argument(
+        "--output_path",
+        default="./dump",
+        type=str,
+        help="The directory to dump and store results and benchmark files."
+    )
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == "__main__":
 
-    num_workers = int(sys.argv[1])
+    args = input_arguments()
+
+    # Load tasks
+    automl_benchmark = openml.study.get_suite(218)
+    task_ids = automl_benchmark.tasks[:args.n_tasks]
+    np.random.shuffle(task_ids)
+
+    # Selecting seeds
+    seeds = np.random.randint(1, 10000, size=args.n_seeds)
+
+    # Loading benchmarks
+    benchmarks = dict()
+    for task_id in task_ids:
+        benchmarks[task_id] = dict()
+        for seed in seeds:
+            benchmarks[task_id][seed] = RandomForestBenchmark(task_id=task_id, seed=seed)
+            benchmarks[task_id][seed].load_data_automl()
+    # Placeholder benchmark to retrieve parameter spaces
+    benchmark = benchmarks[task_ids[0]][seeds[0]]
+
+    # Retrieving observation space and populating grid
+    x_cs = benchmark.x_cs
+    grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=True)
+
+    # Retrieving fidelity spaces and populating grid
+    z_cs = benchmark.z_cs
+    grid_fidelity = get_parameter_grid(z_cs, args.z_grid_size, convert_to_configspace=True)
+
+    # Creating storage directory
+    path = os.path.join(os.getcwd(), args.output_path)
+    os.makedirs(path, exist_ok=True)
+
+    # Dask initialisation
+    num_workers = args.n_workers
     print("Executing with {} worker(s)...".format(num_workers))
-    client = Client(n_workers=num_workers, processes=False, threads_per_worker=1)
-    total_compute_alloted = sum(client.nthreads().values())
-    print(client)
-
-    # sample tasks
-    # TODO: decide properly
-    task_ids = [
-        3,       # kr-vs-kp
-        # 168335,  # MiniBooNE   ### why failed???
-        # 168331,  # volkert
-        31,      # credit-g
-        # 9977     # nomao
-    ]
-
-    n_configs = 5  # number of configurations to be evaluated
-    fidelity_space_granularity = 5  # the number of partitions of each fidelity dimension
-    n_seeds = 4  # number of seeds each config-fidelity will be evaluated
-    seeds = np.random.randint(1, 1000, size=n_seeds)  # each run will collect for different seeds
-    results = {}
-
-    # placeholder initialisation with one of the tasks
-    benchmark = RandomForestBenchmark(task_id=task_ids[0], seed=seeds[0])
-
-    # Create list of configs
-    config_list = benchmark.get_config(size=n_configs)
-    configs = {}
-    # storing a fixed 'n_configs' set that will be evaluated across all task IDs
-    for config in config_list:
-        configs.update({config2hash(config): config})
-
-    # create list of fidelities
-    fidelity_grid = []
-    eps = 1e-10  # to allow the < 'upper' parameter of np.arange to select 'parameter.upper'
-    # 'benchmark.f_cs' contains list of fidelities (2 or more)
-    for i, parameter in enumerate(benchmark.f_cs.get_hyperparameters()):
-        upper, lower = (10 ** parameter.upper, 10 ** parameter.lower) if parameter.log \
-            else (parameter.upper, parameter.lower)
-        if isinstance(parameter, CS.UniformIntegerHyperparameter) and \
-                (upper - lower) < fidelity_space_granularity:
-            step = 1
-        else:
-            step = (upper - lower) / (fidelity_space_granularity - 1)
-        # creates a sequence of points on a fidelity dimensions spanning the range
-        grid_points = np.arange(
-            start=lower, stop=upper + eps, step=step
-        )
-        if parameter.log:
-            grid_points = np.log10(grid_points)
-
-        if isinstance(parameter, CS.UniformIntegerHyperparameter):
-            grid_points = np.ceil(grid_points).astype(int)
-
-        grid_points = np.clip(grid_points, a_min=None, a_max=parameter.upper)
-        fidelity_grid.append(grid_points)
-
-    # creates a grid of all combinations of divisions of each fidelity dimension (fidelity_grid)
-    fidelity_grid = list(itertools.product(*fidelity_grid))
-    fidelity_list = []  # to store all combinations of the fidelity space as ConfigSpace
-    for i, fidelity in enumerate(fidelity_grid):
-        dummy_fidelity = benchmark.f_cs.sample_configuration()
-        for j, parameter in enumerate(benchmark.f_cs.get_hyperparameters()):
-            dummy_fidelity[parameter.name] = fidelity[j]
-        fidelity_list.append(dummy_fidelity)
-
-    fidelities = {}
-    # storing a fixed 'fidelity_list' that will be used to evaluate all configs across all tasks
-    for f in fidelity_list:
-        fidelities.update({config2hash(f): f})
-
-    path = [os.path.join('/'.join(__file__.split('/')[:-1]), 'tmp_dump')]
-
-    # one of the most crucial steps since it collects all possible jobs that will be scheduled
-    # all combinations of evaluations to be made
-    # len(evaluations) = n_configs * fidelity_granularity * n_fidelities
-    evaluations = list(itertools.product(
-        *([task_ids, list(configs.keys()), list(fidelities.keys()), list(path)])
-    ))  #TODO: could be a large list so may want to process in batches
-    np.random.shuffle(evaluations)
-    # 'evaluations' contains a randomly ordered list where each element will be submitted to a
-    # worker informing it of the task_id to run on, the configuration to evaluate and the fidelity
-
-    # function to be submitted to workers for evaluation
-    def loop_fn(evaluation):
-        task_id, config_hash, fidelity_hash, path = evaluation
-        collated_result = {}
-        for seed in seeds:  # seeds available in the scope
-            benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
-            benchmark.load_data_automl()
-            # the lookup dict key for each evaluation is a 4-element tuple
-            result = {
-                (task_id,
-                 config_hash,
-                 fidelity_hash,
-                 seed): benchmark.objective(configs[config_hash], fidelities[fidelity_hash])
-            }
-            collated_result.update(result)
-        # file_collator should collect the pickle files dumped below
-        with open("{}/{}_{}_{}.pkl".format(path, task_id, config_hash, fidelity_hash), 'wb') as f:
-            pickle.dump(collated_result, f)
-        return [{}]
+    client = DaskHelper(args.n_workers)
+    # Essential step:
+    # More than speeding up data management by Dask, creating the benchmark class objects once and
+    # sharing it across all the workers mean that for each task-seed instance, the validation split
+    # remains the same across evaluations, making it a fair collection of data
+    client.distribute_data_to_workers(benchmarks)
 
     start = time.time()
-    futures = []
-    run_history = []
-    total_wait = 0
-
-    # submitting jobs to Dask
-    if len(evaluations) < MAX_TASK_LIMIT_SIZE:
-        futures = client.map(loop_fn, evaluations)
-        wait_start = time.time()
-        wait(futures, return_when='ALL_COMPLETED')
-        total_wait += time.time() - wait_start
-    else:
-        for evaluation in evaluations:
-            done_futures = []
-
-            # adding new evaluation to be made
-            ### at this point the length of futures may become larger than total_compute_alloted
-            ### however, the number of incomplete tasks are always under total_compute_alloted
-            futures.append(client.submit(loop_fn, evaluation))
-
-            # maintain queue length as the total_compute_alloted available
-            if len(futures) > MAX_TASK_LIMIT_SIZE:
-                # wait till at least one future is released for the next evaluation
-                wait_start = time.time()
-                done_futures.extend(wait(futures, return_when='FIRST_COMPLETED').done)
-                total_wait += time.time() - wait_start
+    for combination in itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [path]]):
+        # for a combination selected, need to wait until it is submitted to a worker
+        # client.submit_job() is an asynchronous call, followed by a break which allows the
+        # next combination to be submitted if client.is_worker_available() is True
+        while True:
+            if client.is_worker_available():
+                client.submit_job(compute, return_dict(combination))
+                break
             else:
-                done_futures.extend([f for f in futures if f.done()])
+                client.fetch_futures(retries=5, wait_time=1)
+    end = time.time()
 
-            # storing result and clean up
-            for future in done_futures:
-                # run_history.append(future.result())
-                run_history.extend(future.result())
-                futures.remove(future)
-        # end of loop to distribute jobs
-
-    print("Gathering {} futures".format(len(futures)))
-    for i, result in enumerate(client.gather(futures), start=0):
-        print("{}/{}".format(i, len(futures)), end='\r')
-        run_history.extend(result)
-
-    results = {}
-    for i in range(len(run_history)):
-        results.update(run_history[i])
-
-    client.close()
-
-    print("Time taken since beginning: {:<.5f} seconds".format(time.time() - start))
-    print("Total time spent waiting: {:<.5f} seconds".format(total_wait))
-    print("Total number of jobs submitted: {}".format(len(evaluations)))
-    print("Total number of results logged: {}".format(len(run_history)))
+    print("{} unique configurations evaluated on {} different fidelity combinations for {} seeds "
+          "on {} different tasks in {:.2f} seconds".format(
+        len(grid_config), len(grid_fidelity), args.n_tasks, args.n_seeds, end - start
+    ))
