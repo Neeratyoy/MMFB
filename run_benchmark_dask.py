@@ -244,12 +244,13 @@ if __name__ == "__main__":
     # Dask initialisation
     num_workers = args.n_workers
     logger.info("Executing with {} worker(s)...".format(num_workers))
-    client = DaskHelper(args.n_workers)
-    # Essential step:
-    # More than speeding up data management by Dask, creating the benchmark class objects once and
-    # sharing it across all the workers mean that for each task-seed instance, the validation split
-    # remains the same across evaluations, making it a fair collection of data
-    client.distribute_data_to_workers(benchmarks)
+    if num_workers > 1:
+        client = DaskHelper(args.n_workers)
+        # Essential step:
+        # More than speeding up data management by Dask, creating the benchmark class objects once and
+        # sharing it across all the workers mean that for each task-seed instance, the validation split
+        # remains the same across evaluations, making it a fair collection of data
+        client.distribute_data_to_workers(benchmarks)
 
     start = time.time()
     total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
@@ -257,6 +258,9 @@ if __name__ == "__main__":
             itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [path]]), start=1
     ):
         logger.info("{}/{}".format(i, total_combinations))
+        if num_workers == 1:
+            compute(return_dict(combination), benchmarks)
+            continue
         # for a combination selected, need to wait until it is submitted to a worker
         # client.submit_job() is an asynchronous call, followed by a break which allows the
         # next combination to be submitted if client.is_worker_available() is True
@@ -265,11 +269,11 @@ if __name__ == "__main__":
                 client.submit_job(compute, return_dict(combination))
                 break
             else:
-                client.fetch_futures(retries=5, wait_time=1)
-    if client.is_worker_alive():
+                client.fetch_futures(retries=1, wait_time=0.05)
+    if num_workers > 1 and client.is_worker_alive():
         logger.info("Waiting for pending workers...")
-    while client.is_worker_alive():
-        client.fetch_futures(retries=5, wait_time=1)
+    while num_workers > 1 and client.is_worker_alive():
+        client.fetch_futures(retries=1, wait_time=0.05)
     end = time.time()
 
     logger.info("{} unique configurations evaluated on {} different fidelity combinations for {} "
