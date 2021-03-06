@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import openml
 import pickle
@@ -6,11 +7,20 @@ import hashlib
 import argparse
 import itertools
 import numpy as np
+from loguru import logger
 from distributed import Client
 from multiprocessing.managers import BaseManager
 
 from benchmark import RandomForestBenchmark
 from utils.util import get_parameter_grid
+
+
+logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
+_logger_props = {
+    "format": "{time} {level} {message}",
+    "enqueue": True,
+    "rotation": "500 MB"
+}
 
 
 def config2hash(config):
@@ -132,6 +142,9 @@ class DaskHelper:
     def distribute_data_to_workers(self, data):
         self.shared_data = self.client.scatter(data, broadcast=True)
 
+    def is_worker_alive(self):
+        return len(self.futures) > 0
+
 
 def input_arguments():
     parser = argparse.ArgumentParser()
@@ -183,19 +196,34 @@ if __name__ == "__main__":
 
     args = input_arguments()
 
+    # Creating storage directory
+    path = os.path.join(os.getcwd(), args.output_path)
+    os.makedirs(path, exist_ok=True)
+
+    # Logging details
+    log_suffix = time.strftime("%x %X %Z")
+    log_suffix = log_suffix.replace("/", '-').replace(":", '-').replace(" ", '_')
+    logger.add(
+        "{}/run_{}.log".format(path, log_suffix),
+        **_logger_props
+    )
+
     # Load tasks
+    logger.info("Loading AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
     automl_benchmark = openml.study.get_suite(218)
     task_ids = automl_benchmark.tasks[:args.n_tasks]
     np.random.shuffle(task_ids)
 
     # Selecting seeds
     seeds = np.random.randint(1, 10000, size=args.n_seeds)
+    logger.info("Seeds selected {}".format(seeds))
 
     # Loading benchmarks
     benchmarks = dict()
     for task_id in task_ids:
         benchmarks[task_id] = dict()
         for seed in seeds:
+            logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
             benchmarks[task_id][seed] = RandomForestBenchmark(task_id=task_id, seed=seed)
             benchmarks[task_id][seed].load_data_automl()
     # Placeholder benchmark to retrieve parameter spaces
@@ -203,19 +231,19 @@ if __name__ == "__main__":
 
     # Retrieving observation space and populating grid
     x_cs = benchmark.x_cs
+    logger.info("Populating grid for observation space")
     grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=True)
+    logger.info("{} unique configurations generated".format(len(grid_config)))
 
     # Retrieving fidelity spaces and populating grid
     z_cs = benchmark.z_cs
+    logger.info("Populating grid for fidelity space")
     grid_fidelity = get_parameter_grid(z_cs, args.z_grid_size, convert_to_configspace=True)
-
-    # Creating storage directory
-    path = os.path.join(os.getcwd(), args.output_path)
-    os.makedirs(path, exist_ok=True)
+    logger.info("{} unique configurations generated".format(len(grid_fidelity)))
 
     # Dask initialisation
     num_workers = args.n_workers
-    print("Executing with {} worker(s)...".format(num_workers))
+    logger.info("Executing with {} worker(s)...".format(num_workers))
     client = DaskHelper(args.n_workers)
     # Essential step:
     # More than speeding up data management by Dask, creating the benchmark class objects once and
@@ -224,7 +252,11 @@ if __name__ == "__main__":
     client.distribute_data_to_workers(benchmarks)
 
     start = time.time()
-    for combination in itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [path]]):
+    total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
+    for i, combination in enumerate(
+            itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [path]]), start=1
+    ):
+        logger.info("{}/{}".format(i, total_combinations))
         # for a combination selected, need to wait until it is submitted to a worker
         # client.submit_job() is an asynchronous call, followed by a break which allows the
         # next combination to be submitted if client.is_worker_available() is True
@@ -234,9 +266,13 @@ if __name__ == "__main__":
                 break
             else:
                 client.fetch_futures(retries=5, wait_time=1)
+    if client.is_worker_alive():
+        logger.info("Waiting for pending workers...")
+    while client.is_worker_alive():
+        client.fetch_futures(retries=5, wait_time=1)
     end = time.time()
 
-    print("{} unique configurations evaluated on {} different fidelity combinations for {} seeds "
-          "on {} different tasks in {:.2f} seconds".format(
+    logger.info("{} unique configurations evaluated on {} different fidelity combinations for {} "
+                "seeds on {} different tasks in {:.2f} seconds".format(
         len(grid_config), len(grid_fidelity), args.n_tasks, args.n_seeds, end - start
     ))

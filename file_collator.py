@@ -2,14 +2,20 @@ import os
 import sys
 import time
 import pickle
+import argparse
+
 
 if __name__ == "__main__":
 
-    sleep_wait = int(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sleep", type=int, default=10, help="Sleep in seconds")
+    parser.add_argument("--path", type=str, default="./tmp_dump", help="Directory for files")
+    args = parser.parse_args()
+
+    sleep_wait = args.sleep
+    path = args.path
 
     while True:
-
-        path = 'tmp_dump/'
         if not os.path.isdir(path):
             os.mkdir(path)
 
@@ -26,10 +32,10 @@ if __name__ == "__main__":
         for i, filename in enumerate(file_list, start=1):
             print("{}/{}".format(i, len(file_list)), end='\r')
             # ignore files that are named as 'task_x.pkl'
-            if filename.split('_')[0] == 'task':
+            if filename.split('_')[0] == "task" or filename.split('_')[0] == "run":
                 continue
 
-            with open(os.path.join(path, filename), 'rb') as f:
+            with open(os.path.join(path, filename), "rb") as f:
                 res = pickle.load(f)
 
             for k, v in res.items():
@@ -72,9 +78,10 @@ if __name__ == "__main__":
             os.remove(os.path.join(path, filename))  # deleting file that was appended to task data
 
         temp_file_list = os.listdir(path)  # current snapshot of directory
-        # break/terminate file collection if only files remaining in the directory are task data files
-        if len(temp_file_list) !=0 and \
-                all([file_name.split('_')[0] == 'task' for file_name in temp_file_list]):
+        # terminate file collection if only files remaining in the directory are task/log files
+        if len(temp_file_list) != 0 and \
+                all([file_name.split('_')[0] == 'task' or file_name.split('_')[0] == "run"
+                     for file_name in temp_file_list]):
             break
 
     print("Done!")
