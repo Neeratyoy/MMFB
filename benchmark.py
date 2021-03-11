@@ -17,12 +17,13 @@ from sklearn.metrics import accuracy_score, make_scorer
 
 class RandomForestBenchmark():
 
-    def __init__(self, task_id=None, valid_size=0.33, seed=None):
+    def __init__(self, task_id=None, valid_size=0.33, seed=None, fidelity_choice=0):
         self.task_id = task_id
         self.valid_size = valid_size
         self.seed = seed
         self.rand_state = check_random_state(self.seed)
-        self.z_cs = self.get_fidelity_space()
+        self.fidelity_choice = fidelity_choice
+        self.z_cs = self.get_fidelity_space(self.fidelity_choice)
         self.x_cs = self.get_param_space()
         # data variables
         self.train_X = None
@@ -53,17 +54,31 @@ class RandomForestBenchmark():
         ])
         return cs
 
-    def get_fidelity_space(self):
+    def get_fidelity_space(self, fidelity_choice):
         """Fidelity space available --- specifies the fidelity dimensions
         """
         f_cs = CS.ConfigurationSpace(seed=self.seed)
-
-        f_cs.add_hyperparameters([
-            CS.UniformIntegerHyperparameter('n_estimators', lower=2, upper=100,
-                                            default_value=10, log=False),
-            CS.UniformFloatHyperparameter('subsample', lower=0.1,
-                                          upper=1, default_value=0.33, log=False)
-        ])
+        if fidelity_choice == 1:
+            # only n_estimators as fidelity
+            ntrees = CS.UniformIntegerHyperparameter(
+                'n_estimators', lower=2, upper=100, default_value=10, log=False
+            )
+            subsample = CS.Constant('subsample', value=1)
+        elif fidelity_choice == 2:
+            # only subsample as fidelity
+            ntrees = CS.Constant('n_estimators', value=100)
+            subsample = CS.UniformFloatHyperparameter(
+                'subsample', lower=0.1, upper=1, default_value=0.33, log=False
+            )
+        else:
+            # both n_estimators and subsample as fidelities
+            ntrees = CS.UniformIntegerHyperparameter(
+                'n_estimators', lower=2, upper=100, default_value=10, log=False
+            )
+            subsample = CS.UniformFloatHyperparameter(
+                'subsample', lower=0.1, upper=1, default_value=0.33, log=False
+            )
+        f_cs.add_hyperparameters([ntrees, subsample])
         return f_cs
 
     def get_config(self, size=None):

@@ -53,6 +53,8 @@ def get_parameter_grid(
             param_ranges.append(hp.choices)
         elif isinstance(hp, CS.OrdinalHyperparameter):
             param_ranges.append(hp.sequences)
+        elif isinstance(hp, CS.Constant):
+            param_ranges.append([hp.value])
         else:
             if hp.log:
                 param_ranges.append(

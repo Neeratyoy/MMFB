@@ -9,10 +9,11 @@ import itertools
 import numpy as np
 from loguru import logger
 from distributed import Client
+from typing import Dict, Tuple
 from multiprocessing.managers import BaseManager
 
 from benchmark import RandomForestBenchmark
-from utils.util import get_parameter_grid
+from utils.util import get_parameter_grid, map_to_config
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -29,7 +30,7 @@ def config2hash(config):
     return hashlib.md5(repr(config).encode('utf-8')).hexdigest()
 
 
-def return_dict(combination):
+def return_dict(combination: Tuple) -> Dict:
     assert len(combination) == 5
     evaluation = dict()
     evaluation["task_id"] = combination[0]
@@ -50,6 +51,10 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     benchmarks : dict
         a nested dictionary of the hierarchy task_id-seeds containing instantiations of the
         benchmarks for each task_id - seed pair that is shared across all Dask workers
+
+    Returns
+    -------
+    str
     """
     task_id = evaluation["task_id"]
     config = evaluation["config"]
@@ -78,6 +83,8 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
 
 
 class DaskHelper:
+    """ Manages Dask client and provides associated helper functions.
+    """
     def __init__(self, n_workers):
         self.n_workers = n_workers
         self.client = Client(
@@ -140,6 +147,8 @@ class DaskHelper:
         return None
 
     def distribute_data_to_workers(self, data):
+        """ Shares data across all workers to not serialize and transfer with every job
+        """
         self.shared_data = self.client.scatter(data, broadcast=True)
 
     def is_worker_alive(self):
@@ -147,7 +156,7 @@ class DaskHelper:
 
 
 def input_arguments():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
         "--n_tasks",
         default=3,
@@ -158,7 +167,7 @@ def input_arguments():
         "--x_grid_size",
         default=10,
         type=int,
-        help="The size of grid steps to split each dimension of the observation space. For a "
+        help="The size of grid steps to split each dimension of the observation space.\nFor a "
              "parameter with range [0, 20] and step size of 10, the resultant grid would be "
              "[0, 2.22, 4.44, ..., 17.78, 20], using numpy.linspace."
     )
@@ -166,9 +175,18 @@ def input_arguments():
         "--z_grid_size",
         default=10,
         type=int,
-        help="The size of grid steps to split each dimension of the fidelity space. For a "
+        help="The size of grid steps to split each dimension of the fidelity space.\nFor a "
              "parameter with range [0, 20] and step size of 10, the resultant grid would be "
              "[0, 2.22, 4.44, ..., 17.78, 20], using numpy.linspace."
+    )
+    parser.add_argument(
+        "--fidelity_choice",
+        default=0,
+        type=int,
+        help="Choice of fidelity space:\n"
+             "0: Both number of trees (n_estimators) and dataset subset fraction (subsample)\n"
+             "1: n_estimators as fidelity with dataset subset fraction fixed (subsample=1)\n"
+             "2: subsample as fidelity with number of trees fixed (n_estimators=100)"
     )
     parser.add_argument(
         "--n_seeds",
@@ -207,6 +225,7 @@ if __name__ == "__main__":
         "{}/run_{}.log".format(path, log_suffix),
         **_logger_props
     )
+    print("Logging at {}/run_{}.log".format(path, log_suffix))
 
     # Load tasks
     logger.info("Loading AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
@@ -224,21 +243,23 @@ if __name__ == "__main__":
         benchmarks[task_id] = dict()
         for seed in seeds:
             logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
-            benchmarks[task_id][seed] = RandomForestBenchmark(task_id=task_id, seed=seed)
+            benchmarks[task_id][seed] = RandomForestBenchmark(
+                task_id=task_id, seed=seed, fidelity_choice=args.fidelity_choice
+            )
             benchmarks[task_id][seed].load_data_automl()
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = benchmarks[task_ids[0]][seeds[0]]
 
     # Retrieving observation space and populating grid
     x_cs = benchmark.x_cs
-    logger.info("Populating grid for observation space")
-    grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=True)
+    logger.info("Populating grid for observation space...")
+    grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=False)
     logger.info("{} unique configurations generated".format(len(grid_config)))
 
     # Retrieving fidelity spaces and populating grid
     z_cs = benchmark.z_cs
-    logger.info("Populating grid for fidelity space")
-    grid_fidelity = get_parameter_grid(z_cs, args.z_grid_size, convert_to_configspace=True)
+    logger.info("Populating grid for fidelity space...")
+    grid_fidelity = get_parameter_grid(z_cs, args.z_grid_size, convert_to_configspace=False)
     logger.info("{} unique configurations generated".format(len(grid_fidelity)))
 
     # Dask initialisation
@@ -247,10 +268,10 @@ if __name__ == "__main__":
     if num_workers > 1:
         client = DaskHelper(args.n_workers)
         # Essential step:
-        # More than speeding up data management by Dask, creating the benchmark class objects once and
-        # sharing it across all the workers mean that for each task-seed instance, the validation split
-        # remains the same across evaluations, making it a fair collection of data
-        client.distribute_data_to_workers(benchmarks)
+        # More than speeding up data management by Dask, creating the benchmark class objects once
+        # and sharing it across all the workers mean that for each task-seed instance, the
+        # validation split remains the same across evaluations, making it a fair collection of data
+        # client.distribute_data_to_workers(benchmarks)
 
     start = time.time()
     total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
@@ -258,6 +279,9 @@ if __name__ == "__main__":
             itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [path]]), start=1
     ):
         logger.info("{}/{}".format(i, total_combinations))
+        combination = list(combination)
+        combination[1] = map_to_config(x_cs, combination[1])
+        combination[2] = map_to_config(z_cs, combination[2])
         if num_workers == 1:
             compute(return_dict(combination), benchmarks)
             continue
