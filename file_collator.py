@@ -15,24 +15,29 @@ if __name__ == "__main__":
     sleep_wait = args.sleep
     path = args.path
 
+    initial_file_list = os.listdir(path)
+
     while True:
         if not os.path.isdir(path):
             os.mkdir(path)
 
         # collect all files in the directory
         file_list = os.listdir(path)
-        print("\nSnapshot taken from directory --> {} files found!".format(len(file_list)))
+        print("|-- Snapshot taken from directory --> {} files found!".format(len(file_list)))
+        print("|...sleeping...")
 
         # sleep to allow disk writes to be completed for the collected file names
         time.sleep(sleep_wait)
 
         previous_task_id = None
 
-        print("Starting collection...")
+        print("|-- Starting collection")
         for i, filename in enumerate(file_list, start=1):
-            print("{}/{}".format(i, len(file_list)), end='\r')
-            # ignore files that are named as 'task_x.pkl'
-            if filename.split('_')[0] == "task" or filename.split('_')[0] == "run":
+            print("|-- Processing {}/{}".format(i, len(file_list)), end='\r')
+            # ignore files that are named as 'task_x.pkl or run_*.log'
+            if (filename.split('_')[0] == "task" and filename.split('.')[-1] == "pkl") or \
+                    (filename.split('_')[0] == "run" and filename.split('.')[-1] == "log") or \
+                    os.path.isdir(os.path.join(path, filename)):
                 continue
 
             with open(os.path.join(path, filename), "rb") as f:
@@ -74,12 +79,7 @@ if __name__ == "__main__":
                     pickle.dump(main_data, f)
 
             os.remove(os.path.join(path, filename))  # deleting file that was appended to task data
-
-        temp_file_list = os.listdir(path)  # current snapshot of directory
-        # terminate file collection if only files remaining in the directory are task/log files
-        if len(temp_file_list) != 0 and \
-                all([file_name.split('_')[0] == 'task' or file_name.split('_')[0] == "run"
-                     for file_name in temp_file_list]):
-            break
+        print("\n|-- Continuing")
+        print("|{}".format("-" * 25))
 
     print("Done!")

@@ -234,7 +234,8 @@ if __name__ == "__main__":
         "{}/run_{}.log".format(path, log_suffix),
         **_logger_props
     )
-    print("Logging at {}/run_{}.log".format(path, log_suffix))
+    os.makedirs("{}/logs".format(path), exist_ok=True)
+    print("Logging at {}/logs/run_{}.log".format(path, log_suffix))
 
     # Load tasks
     logger.info("Loading AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
