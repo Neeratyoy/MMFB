@@ -206,6 +206,12 @@ def input_arguments():
         type=str,
         help="The directory to dump and store results and benchmark files."
     )
+    parser.add_argument(
+        "--seed",
+        default=None,
+        type=int,
+        help="The seed for the complete benchmark collection"
+    )
     args = parser.parse_args()
     return args
 
@@ -213,6 +219,9 @@ def input_arguments():
 if __name__ == "__main__":
 
     args = input_arguments()
+
+    # Setting seed
+    np.random.seed(args.seed)
 
     # Creating storage directory
     path = os.path.join(os.getcwd(), args.output_path)
@@ -271,7 +280,7 @@ if __name__ == "__main__":
         # More than speeding up data management by Dask, creating the benchmark class objects once
         # and sharing it across all the workers mean that for each task-seed instance, the
         # validation split remains the same across evaluations, making it a fair collection of data
-        # client.distribute_data_to_workers(benchmarks)
+        client.distribute_data_to_workers(benchmarks)
 
     start = time.time()
     total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
@@ -290,6 +299,7 @@ if __name__ == "__main__":
         # next combination to be submitted if client.is_worker_available() is True
         while True:
             if client.is_worker_available():
+                # benchmarks should be provided as a second argument to compute() by dask
                 client.submit_job(compute, return_dict(combination))
                 break
             else:
