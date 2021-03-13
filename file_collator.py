@@ -10,6 +10,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sleep", type=int, default=10, help="Sleep in seconds")
     parser.add_argument("--path", type=str, default="./tmp_dump", help="Directory for files")
+    parser.add_argument("--max_batch_size", type=int, default=100000,
+                        help="The number of files to process per loop iteration")
     args = parser.parse_args()
 
     sleep_wait = args.sleep
@@ -22,14 +24,12 @@ if __name__ == "__main__":
             os.mkdir(path)
 
         # collect all files in the directory
-        file_list = os.listdir(path)
+        file_list = os.listdir(path)[:args.max_batch_size]
         print("|-- Snapshot taken from directory --> {} files found!".format(len(file_list)))
         print("|...sleeping...")
 
         # sleep to allow disk writes to be completed for the collected file names
         time.sleep(sleep_wait)
-
-        previous_task_id = None
 
         print("|-- Starting collection")
         for i, filename in enumerate(file_list, start=1):
@@ -46,8 +46,6 @@ if __name__ == "__main__":
             except FileNotFoundError:
                 # if file was collected with os.listdir but deleted in the meanwhile, ignore it
                 continue
-            except Exception as e:
-                raise Exception(repr(e))
 
             for k, v in res.items():
                 task_id, config_hash, fidelity_hash, seed = k
@@ -84,7 +82,10 @@ if __name__ == "__main__":
                 with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
                     pickle.dump(main_data, f)
 
-            os.remove(os.path.join(path, filename))  # deleting file that was appended to task data
+            try:
+                os.remove(os.path.join(path, filename))  # deleting data file that was processed
+            except FileNotFoundError:
+                continue
         print("\n|-- Continuing")
         print("|{}".format("-" * 25))
 
