@@ -40,8 +40,14 @@ if __name__ == "__main__":
                     os.path.isdir(os.path.join(path, filename)):
                 continue
 
-            with open(os.path.join(path, filename), "rb") as f:
-                res = pickle.load(f)
+            try:
+                with open(os.path.join(path, filename), "rb") as f:
+                    res = pickle.load(f)
+            except FileNotFoundError:
+                # if file was collected with os.listdir but deleted in the meanwhile, ignore it
+                continue
+            except Exception as e:
+                raise Exception(repr(e))
 
             for k, v in res.items():
                 task_id, config_hash, fidelity_hash, seed = k
