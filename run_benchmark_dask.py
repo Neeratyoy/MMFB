@@ -10,7 +10,6 @@ import numpy as np
 from loguru import logger
 from distributed import Client
 from typing import Dict, Tuple
-from multiprocessing.managers import BaseManager
 
 from benchmark import RandomForestBenchmark
 from utils.util import get_parameter_grid, map_to_config
@@ -208,7 +207,7 @@ def input_arguments():
     )
     parser.add_argument(
         "--seed",
-        default=None,
+        default=1234,
         type=int,
         help="The seed for the complete benchmark collection"
     )
