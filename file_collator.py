@@ -75,8 +75,12 @@ if __name__ == "__main__":
                     main_data.update(obj)
                 elif fidelity_hash not in main_data[config_hash].keys():
                     main_data[config_hash].update(obj[config_hash])
-                else:
+                elif seed not in main_data[config_hash][fidelity_hash].keys():
                     main_data[config_hash][fidelity_hash].update(obj[config_hash][fidelity_hash])
+                else:
+                    main_data[config_hash][fidelity_hash][seed].update(
+                        obj[config_hash][fidelity_hash][seed]
+                    )
 
                 # updating file for the task_id
                 with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
