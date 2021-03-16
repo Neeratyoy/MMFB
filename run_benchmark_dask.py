@@ -229,12 +229,12 @@ if __name__ == "__main__":
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
     log_suffix = log_suffix.replace("/", '-').replace(":", '-').replace(" ", '_')
-    logger.add(
-        "{}/run_{}.log".format(path, log_suffix),
-        **_logger_props
-    )
     os.makedirs("{}/logs".format(path), exist_ok=True)
     print("Logging at {}/logs/run_{}.log".format(path, log_suffix))
+    logger.add(
+        "{}/logs/run_{}.log".format(path, log_suffix),
+        **_logger_props
+    )
 
     # Load tasks
     logger.info("Loading AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
