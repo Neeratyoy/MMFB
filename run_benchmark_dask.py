@@ -10,6 +10,7 @@ import numpy as np
 from loguru import logger
 from distributed import Client
 from typing import Dict, Tuple
+from pympler.asizeof import asizeof
 
 from benchmark import RandomForestBenchmark
 from utils.util import get_parameter_grid, map_to_config
@@ -84,14 +85,18 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
 class DaskHelper:
     """ Manages Dask client and provides associated helper functions.
     """
-    def __init__(self, n_workers):
-        self.n_workers = n_workers
-        self.client = Client(
-            n_workers=self.n_workers,
-            processes=True,
-            threads_per_worker=1,
-            scheduler_port=0
-        )
+    def __init__(self, n_workers=1, client=None):
+        if client is not None and isinstance(client, Client):
+            self.client = client
+            self.n_workers = len(self.client.ncores())
+        else:
+            self.n_workers = n_workers
+            self.client = Client(
+                n_workers=self.n_workers,
+                processes=True,
+                threads_per_worker=1,
+                scheduler_port=0
+            )
         self.futures = []
         self.shared_data = None
 
@@ -120,7 +125,7 @@ class DaskHelper:
         if self.n_workers == 1:
             # in the synchronous case, one worker is always available
             return True
-        workers = sum(self.client.nthreads().values())
+        workers = len(self.client.ncores())
         if len(self.futures) >= workers:
             # pause/wait if active worker count greater allocated workers
             return False
@@ -200,6 +205,12 @@ def input_arguments():
         help="The number of workers to distribute the evaluation over."
     )
     parser.add_argument(
+        "--scheduler_file",
+        default=None,
+        type=str,
+        help="The file path to the Dask scheduler information."
+    )
+    parser.add_argument(
         "--output_path",
         default="./dump",
         type=str,
@@ -225,15 +236,15 @@ if __name__ == "__main__":
     # Creating storage directory
     path = os.path.join(os.getcwd(), args.output_path)
     os.makedirs(path, exist_ok=True)
+    os.makedirs("{}/logs".format(path), exist_ok=True)
 
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
     log_suffix = log_suffix.replace("/", '-').replace(":", '-').replace(" ", '_')
     logger.add(
-        "{}/run_{}.log".format(path, log_suffix),
+        "{}/logs/run_{}.log".format(path, log_suffix),
         **_logger_props
     )
-    os.makedirs("{}/logs".format(path), exist_ok=True)
     print("Logging at {}/logs/run_{}.log".format(path, log_suffix))
 
     # Load tasks
@@ -264,23 +275,34 @@ if __name__ == "__main__":
     logger.info("Populating grid for observation space...")
     grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=False)
     logger.info("{} unique configurations generated".format(len(grid_config)))
+    logger.debug("Observation space grid size: {:.2f} MB".format(asizeof(grid_config) / 1024 ** 2))
 
     # Retrieving fidelity spaces and populating grid
     z_cs = benchmark.z_cs
     logger.info("Populating grid for fidelity space...")
     grid_fidelity = get_parameter_grid(z_cs, args.z_grid_size, convert_to_configspace=False)
     logger.info("{} unique configurations generated".format(len(grid_fidelity)))
+    logger.debug("Fidelity space grid size: {:.2f} MB".format(asizeof(grid_fidelity) / 1024 ** 2))
 
     # Dask initialisation
-    num_workers = args.n_workers
-    logger.info("Executing with {} worker(s)...".format(num_workers))
-    if num_workers > 1:
-        client = DaskHelper(args.n_workers)
-        # Essential step:
-        # More than speeding up data management by Dask, creating the benchmark class objects once
-        # and sharing it across all the workers mean that for each task-seed instance, the
-        # validation split remains the same across evaluations, making it a fair collection of data
-        client.distribute_data_to_workers(benchmarks)
+    if args.scheduler_file is not None and os.path.isfile(args.scheduler_file):
+        logger.info("Connecting to scheduler...")
+        client = Client(scheduler_file=args.scheduler_file)
+        client = DaskHelper(client=client)
+        num_workers = client.n_workers
+    else:
+        num_workers = args.n_workers
+        client = None
+        if num_workers > 1:
+            logger.info("Creating Dask client...")
+            client = DaskHelper(args.n_workers)
+            # Essential step:
+            # More than speeding up data management by Dask, creating the benchmark class objects
+            # once and sharing it across all the workers mean that for each task-seed instance,
+            # the validation split remains the same across evaluations
+            client.distribute_data_to_workers(benchmarks)
+    logger.info("Executing with {} worker(s)".format(num_workers))
+    logger.info("Dask Client information: {}".format(client.client))
 
     start = time.time()
     total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
@@ -288,6 +310,7 @@ if __name__ == "__main__":
             itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [path]]), start=1
     ):
         logger.info("{}/{}".format(i, total_combinations))
+        logger.debug("Running for {:.2f} seconds".format(time.time() - start))
         combination = list(combination)
         combination[1] = map_to_config(x_cs, combination[1])
         combination[2] = map_to_config(z_cs, combination[2])

@@ -3,6 +3,15 @@ import sys
 import time
 import pickle
 import argparse
+from loguru import logger
+
+
+logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
+_logger_props = {
+    "format": "{time} {level} {message}",
+    "enqueue": True,
+    "rotation": "500 MB"
+}
 
 
 if __name__ == "__main__":
@@ -16,8 +25,20 @@ if __name__ == "__main__":
 
     sleep_wait = args.sleep
     path = args.path
+    os.makedirs(path, exist_ok=True)
+    os.makedirs("{}/logs".format(path), exist_ok=True)
+
+    # Logging details
+    log_suffix = time.strftime("%x %X %Z")
+    log_suffix = log_suffix.replace("/", '-').replace(":", '-').replace(" ", '_')
+    logger.add(
+        "{}/logs/collator_{}.log".format(path, log_suffix),
+        **_logger_props
+    )
+    print("Logging at {}/logs/collator_{}.log".format(path, log_suffix))
 
     initial_file_list = os.listdir(path)
+    file_count = 0
 
     while True:
         if not os.path.isdir(path):
@@ -25,15 +46,16 @@ if __name__ == "__main__":
 
         # collect all files in the directory
         file_list = os.listdir(path)[:args.max_batch_size]
-        print("|-- Snapshot taken from directory --> {} files found!".format(len(file_list)))
-        print("|...sleeping...")
+        logger.info("\tSnapshot taken from directory --> {} files found!".format(len(file_list)))
+        logger.info("\tsleeping...")
 
         # sleep to allow disk writes to be completed for the collected file names
         time.sleep(sleep_wait)
 
-        print("|-- Starting collection")
+        start = time.time()
+        logger.info("\tStarting collection...")
         for i, filename in enumerate(file_list, start=1):
-            print("|-- Processing {}/{}".format(i, len(file_list)), end='\r')
+            logger.debug("\tProcessing {}/{}".format(i, len(file_list)), end='\r')
             # ignore files that are named as 'task_x.pkl or run_*.log'
             if (filename.split('_')[0] == "task" and filename.split('.')[-1] == "pkl") or \
                     (filename.split('_')[0] == "run" and filename.split('.')[-1] == "log") or \
@@ -85,12 +107,15 @@ if __name__ == "__main__":
                 # updating file for the task_id
                 with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
                     pickle.dump(main_data, f)
+                file_count += 1
 
             try:
                 os.remove(os.path.join(path, filename))  # deleting data file that was processed
             except FileNotFoundError:
                 continue
-        print("\n|-- Continuing")
-        print("|{}".format("-" * 25))
+        logger.info("\tFinished batch processing in {:.3f} seconds".format(time.time() - start))
+        logger.info("\tContinuing to next batch")
+        logger.info("\t{}".format("-" * 25))
 
-    print("Done!")
+    logger.info("Done!")
+    logger.info("Total files processed: {}".format(file_count))
