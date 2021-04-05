@@ -15,7 +15,8 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.metrics import accuracy_score, make_scorer
 
 
-class RandomForestBenchmark():
+class RandomForestBenchmark:
+    _issue_tasks = [3917, 3945]
 
     def __init__(self, task_id=None, valid_size=0.33, seed=None, fidelity_choice=0):
         self.task_id = task_id
@@ -95,7 +96,17 @@ class RandomForestBenchmark():
             return self.f_cs.sample_configuration()
         return [self.f_cs.sample_configuration() for i in range(size)]
 
-    def load_data_automl(self, verbose=False):
+    def _convert_labels(self, labels):
+        label_types = list(map(lambda x: isinstance(x, bool), labels))
+        if np.all(label_types):
+            _labels = list(map(lambda x: str(x), labels))
+            if isinstance(labels, pd.Series):
+                labels = pd.Series(_labels, index=labels.index)
+            elif isinstance(labels, np.array):
+                labels = np.array(labels)
+        return labels
+
+    def load_data_from_openml(self, verbose=False):
         """Fetches data from OpenML and initializes the train-validation-test data splits
 
         The validation set is fixed till this function is called again or explicitly altered
@@ -153,9 +164,14 @@ class RandomForestBenchmark():
             print("Shape of data pre-preprocessing: {}".format(train_X.shape))
         # preprocessor fit only on the training set
         self.train_X = self.preprocessor.fit_transform(self.train_X)
-        # aaplying preprocessor built on the training set, across validation and test splits
+        # applying preprocessor built on the training set, across validation and test splits
         self.valid_X = self.preprocessor.transform(self.valid_X)
         self.test_X = self.preprocessor.transform(self.test_X)
+        # converting boolean labels to strings
+        self.train_y = self._convert_labels(self.train_y)
+        self.valid_y = self._convert_labels(self.valid_y)
+        self.test_y = self._convert_labels(self.test_y)
+
         if verbose:
             print("Shape of data post-preprocessing: {}".format(train_X.shape), "\n")
 

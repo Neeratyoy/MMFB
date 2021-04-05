@@ -4,6 +4,7 @@ import time
 import openml
 import pickle
 import hashlib
+import warnings
 import argparse
 import itertools
 import numpy as np
@@ -163,9 +164,15 @@ def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
         "--n_tasks",
-        default=3,
+        default=None,
         type=int,
         help="The number of tasks to run data collection on from the AutoML benchmark suite"
+    )
+    parser.add_argument(
+        "--task_id",
+        default=None,
+        type=int,
+        help="The taks_id to run from the AutoML benchmark suite"
     )
     parser.add_argument(
         "--x_grid_size",
@@ -194,7 +201,7 @@ def input_arguments():
     )
     parser.add_argument(
         "--n_seeds",
-        default=4,
+        default=3,
         type=int,
         help="The number of different seeds to evaluate each configuration-fidelity on."
     )
@@ -230,6 +237,26 @@ if __name__ == "__main__":
 
     args = input_arguments()
 
+    # Task input check
+    automl_benchmark = openml.study.get_suite(218)
+    task_ids = automl_benchmark.tasks
+    if args.n_tasks is None and args.task_id is None:
+        warnings.warn("Both task_id or number of tasks were not specified. "
+                      "Will run all {} tasks!".format(len(task_ids)))
+        args.n_tasks = len(task_ids)
+    elif args.n_tasks is None and args.task_id is not None:
+        if args.task_id not in task_ids:
+            raise ValueError("Not a valid Task ID from among: {}".format(task_ids))
+        task_ids = [args.task_id]
+        args.n_tasks = 1
+    elif args.n_tasks is not None and args.task_id is None:
+        if args.n_tasks > len(task_ids):
+            warnings.warn("{} tasks not available. "
+                          "Running with {} tasks instead!".format(args.n_tasks, len(task_ids)))
+        task_ids = task_ids[:args.n_tasks]
+    else:
+        raise ValueError("Should specify either n_tasks or task_id, not both!")
+
     # Setting seed
     np.random.seed(args.seed)
 
@@ -248,9 +275,7 @@ if __name__ == "__main__":
     print("Logging at {}/logs/run_{}.log".format(path, log_suffix))
 
     # Load tasks
-    logger.info("Loading AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
-    automl_benchmark = openml.study.get_suite(218)
-    task_ids = automl_benchmark.tasks[:args.n_tasks]
+    logger.info("Loaded AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
     np.random.shuffle(task_ids)
 
     # Selecting seeds
@@ -266,7 +291,7 @@ if __name__ == "__main__":
             benchmarks[task_id][seed] = RandomForestBenchmark(
                 task_id=task_id, seed=seed, fidelity_choice=args.fidelity_choice
             )
-            benchmarks[task_id][seed].load_data_automl()
+            benchmarks[task_id][seed].load_data_from_openml()
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = benchmarks[task_ids[0]][seeds[0]]
 
@@ -290,6 +315,7 @@ if __name__ == "__main__":
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
         num_workers = client.n_workers
+        logger.info("Dask Client information: {}".format(client.client))
     else:
         num_workers = args.n_workers
         client = None
@@ -301,8 +327,8 @@ if __name__ == "__main__":
             # once and sharing it across all the workers mean that for each task-seed instance,
             # the validation split remains the same across evaluations
             client.distribute_data_to_workers(benchmarks)
+            logger.info("Dask Client information: {}".format(client.client))
     logger.info("Executing with {} worker(s)".format(num_workers))
-    logger.info("Dask Client information: {}".format(client.client))
 
     start = time.time()
     total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
@@ -335,5 +361,5 @@ if __name__ == "__main__":
 
     logger.info("{} unique configurations evaluated on {} different fidelity combinations for {} "
                 "seeds on {} different tasks in {:.2f} seconds".format(
-        len(grid_config), len(grid_fidelity), args.n_tasks, args.n_seeds, end - start
+        len(grid_config), len(grid_fidelity), args.n_seeds, args.n_tasks, end - start
     ))

@@ -26,7 +26,7 @@ if __name__ == "__main__":
         print("{}/{} --- {}".format(i, len(task_ids), task_id), end=" ")
         try:
             benchmark = RandomForestBenchmark(task_id=task_id, seed=np.random.randint(1, 1000))
-            benchmark.load_data_automl()
+            benchmark.load_data_from_openml()
             config = benchmark.x_cs.sample_configuration()
             fidelity = benchmark.z_cs.sample_configuration()
             benchmark.objective(config, fidelity)

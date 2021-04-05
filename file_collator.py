@@ -3,7 +3,10 @@ import sys
 import time
 import pickle
 import argparse
+import numpy as np
+from copy import deepcopy
 from loguru import logger
+from joblib.parallel import Parallel, parallel_backend, delayed
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -14,6 +17,52 @@ _logger_props = {
 }
 
 
+def retrieve_task_ids(filenames):
+    task_ids = []
+    for i, filename in enumerate(filenames, start=1):
+        try:
+            task_id = int(filename.split("_")[0])
+        except ValueError:
+            continue
+        task_ids.append(task_id)
+    return np.unique(task_ids)
+
+
+def update_table_with_new_entry(main_data, new_entry):
+    config_hash = list(new_entry.keys())[0]
+    fidelity_hash = list(new_entry[config_hash].keys())[0]
+    seed = list(new_entry[config_hash][fidelity_hash].keys())[0]
+    if config_hash not in main_data.keys():
+        main_data.update(new_entry)
+    elif fidelity_hash not in main_data[config_hash].keys():
+        main_data[config_hash].update(new_entry[config_hash])
+    elif seed not in main_data[config_hash][fidelity_hash].keys():
+        main_data[config_hash][fidelity_hash].update(new_entry[config_hash][fidelity_hash])
+    else:
+        main_data[config_hash][fidelity_hash][seed].update(
+            new_entry[config_hash][fidelity_hash][seed]
+        )
+    return main_data
+
+
+def save_task_file(task_id, task_dict, path):
+    obj = task_dict
+    if os.path.isfile(os.path.join(path, "task_{}.pkl".format(task_id))):
+        # if file exists, read the file, append, write
+        with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'rb') as f:
+            data = pickle.load(f)
+        # with time `data` will be larger in size than `obj`
+        for _config in obj.keys():
+            for _fidelity in obj[_config].keys():
+                for _seed in obj[_config][_fidelity].keys():
+                    _data = {_config: {_fidelity: {_seed: obj[_config][_fidelity][_seed]}}}
+                    data = update_table_with_new_entry(data, _data)
+        obj = data
+    with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
+        pickle.dump(obj, f)
+    return
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -21,6 +70,8 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default="./tmp_dump", help="Directory for files")
     parser.add_argument("--max_batch_size", type=int, default=100000,
                         help="The number of files to process per loop iteration")
+    parser.add_argument("--n_jobs", type=int, default=1,
+                        help="The number of parallel cores for speeding up file writes per task")
     args = parser.parse_args()
 
     sleep_wait = args.sleep
@@ -51,6 +102,12 @@ if __name__ == "__main__":
 
         # sleep to allow disk writes to be completed for the collected file names
         time.sleep(sleep_wait)
+
+        _task_ids = retrieve_task_ids(file_list)
+        logger.info("\tTask IDs found: {}".format(_task_ids))
+        task_datas = dict()
+        for tid in _task_ids:
+            task_datas[tid] = dict()
 
         start = time.time()
         logger.info("\tStarting collection...")
@@ -83,37 +140,21 @@ if __name__ == "__main__":
                         }
                     }
                 }
-                # if no data for this task_id seen yet, create file
-                if not os.path.isfile(os.path.join(path, "task_{}.pkl".format(task_id))):
-                    # create the file
-                    with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
-                        pickle.dump(obj, f)
-                    continue
-
-                with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'rb') as f:
-                    main_data = pickle.load(f)
-
-                if config_hash not in main_data.keys():
-                    main_data.update(obj)
-                elif fidelity_hash not in main_data[config_hash].keys():
-                    main_data[config_hash].update(obj[config_hash])
-                elif seed not in main_data[config_hash][fidelity_hash].keys():
-                    main_data[config_hash][fidelity_hash].update(obj[config_hash][fidelity_hash])
-                else:
-                    main_data[config_hash][fidelity_hash][seed].update(
-                        obj[config_hash][fidelity_hash][seed]
-                    )
-
-                # updating file for the task_id
-                with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
-                    pickle.dump(main_data, f)
+                task_datas[task_id] = update_table_with_new_entry(task_datas[task_id], obj)
                 file_count += 1
 
             try:
                 os.remove(os.path.join(path, filename))  # deleting data file that was processed
             except FileNotFoundError:
                 continue
+
         logger.info("\tFinished batch processing in {:.3f} seconds".format(time.time() - start))
+        logger.info("\tUpdating benchmark data files...")
+
+        with parallel_backend(backend="loky", n_jobs=args.n_jobs):
+            Parallel()(
+                delayed(save_task_file)(task_id, obj, path) for task_id, obj in task_datas.items()
+            )
         logger.info("\tContinuing to next batch")
         logger.info("\t{}".format("-" * 25))
 
