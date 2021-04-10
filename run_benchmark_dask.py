@@ -321,7 +321,7 @@ if __name__ == "__main__":
         client = None
         if num_workers > 1:
             logger.info("Creating Dask client...")
-            client = DaskHelper(args.n_workers)
+            client = DaskHelper(n_workers=args.n_workers)
             # Essential step:
             # More than speeding up data management by Dask, creating the benchmark class objects
             # once and sharing it across all the workers mean that for each task-seed instance,
