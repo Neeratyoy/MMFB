@@ -264,6 +264,9 @@ if __name__ == "__main__":
     path = os.path.join(os.getcwd(), args.output_path)
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
+    os.makedirs("{}/dump".format(path), exist_ok=True)
+    dump_path = os.path.join(path, "dump")
+    os.makedirs(dump_path, exist_ok=True)
 
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
@@ -333,7 +336,7 @@ if __name__ == "__main__":
     start = time.time()
     total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
     for i, combination in enumerate(
-            itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [path]]), start=1
+            itertools.product(*[task_ids, grid_config, grid_fidelity, seeds, [dump_path]]), start=1
     ):
         logger.info("{}/{}".format(i, total_combinations))
         logger.debug("Running for {:.2f} seconds".format(time.time() - start))

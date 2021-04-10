@@ -78,6 +78,7 @@ if __name__ == "__main__":
     path = args.path
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
+    dump_path = os.path.join(path, "dump")
 
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
@@ -92,11 +93,8 @@ if __name__ == "__main__":
     file_count = 0
 
     while True:
-        if not os.path.isdir(path):
-            os.mkdir(path)
-
         # collect all files in the directory
-        file_list = os.listdir(path)[:args.max_batch_size]
+        file_list = os.listdir(dump_path)[:args.max_batch_size]
         logger.info("\tSnapshot taken from directory --> {} files found!".format(len(file_list)))
         logger.info("\tsleeping...")
 
@@ -116,11 +114,11 @@ if __name__ == "__main__":
             # ignore files that are named as 'task_x.pkl or run_*.log'
             if (filename.split('_')[0] == "task" and filename.split('.')[-1] == "pkl") or \
                     (filename.split('_')[0] == "run" and filename.split('.')[-1] == "log") or \
-                    os.path.isdir(os.path.join(path, filename)):
+                    os.path.isdir(os.path.join(dump_path, filename)):
                 continue
 
             try:
-                with open(os.path.join(path, filename), "rb") as f:
+                with open(os.path.join(dump_path, filename), "rb") as f:
                     res = pickle.load(f)
             except FileNotFoundError:
                 # if file was collected with os.listdir but deleted in the meanwhile, ignore it
@@ -144,7 +142,7 @@ if __name__ == "__main__":
                 file_count += 1
 
             try:
-                os.remove(os.path.join(path, filename))  # deleting data file that was processed
+                os.remove(os.path.join(dump_path, filename))  # deleting data file that was processed
             except FileNotFoundError:
                 continue
 
