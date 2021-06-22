@@ -4,6 +4,7 @@ __pycache__/
 .ipynb_checkpoints/
 dask-worker-space/
 tmp_dump/
+notebooks/
 
 # files
 *.pkl

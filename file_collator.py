@@ -21,7 +21,7 @@ def retrieve_task_ids(filenames):
     task_ids = []
     for i, filename in enumerate(filenames, start=1):
         try:
-            task_id = int(filename.split("_")[0])
+            task_id = int(filename.split("/")[-1].split("_")[0])
         except ValueError:
             continue
         task_ids.append(task_id)
@@ -79,6 +79,8 @@ if __name__ == "__main__":
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
     dump_path = os.path.join(path, "dump")
+    output_path = os.path.join(path, "benchmark")
+    os.makedirs(output_path, exist_ok=True)
 
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
@@ -93,8 +95,15 @@ if __name__ == "__main__":
     file_count = 0
 
     while True:
+        # list available tasks
+        task_ids = [int(tid) for tid in os.listdir(dump_path)]
+        batch_size = args.max_batch_size // len(task_ids)
+
         # collect all files in the directory
-        file_list = os.listdir(dump_path)[:args.max_batch_size]
+        file_list = []
+        for tid in task_ids:
+            _file_list = os.listdir(os.path.join(dump_path, str(tid)))[:batch_size]
+            file_list.extend([os.path.join(str(tid), f) for f in _file_list])
         logger.info("\tSnapshot taken from directory --> {} files found!".format(len(file_list)))
         logger.info("\tsleeping...")
 
@@ -111,7 +120,7 @@ if __name__ == "__main__":
         logger.info("\tStarting collection...")
         for i, filename in enumerate(file_list, start=1):
             logger.debug("\tProcessing {}/{}".format(i, len(file_list)), end='\r')
-            # ignore files that are named as 'task_x.pkl or run_*.log'
+            # ignore files that are named as 'task_*.pkl or run_*.log'
             if (filename.split('_')[0] == "task" and filename.split('.')[-1] == "pkl") or \
                     (filename.split('_')[0] == "run" and filename.split('.')[-1] == "log") or \
                     os.path.isdir(os.path.join(dump_path, filename)):
@@ -142,7 +151,9 @@ if __name__ == "__main__":
                 file_count += 1
 
             try:
-                os.remove(os.path.join(dump_path, filename))  # deleting data file that was processed
+                # deleting data file that was processed
+                os.remove(os.path.join(dump_path, filename))
+                # os.remove(os.path.join(dump_path, filename))
             except FileNotFoundError:
                 continue
 
@@ -151,7 +162,7 @@ if __name__ == "__main__":
 
         with parallel_backend(backend="loky", n_jobs=args.n_jobs):
             Parallel()(
-                delayed(save_task_file)(task_id, obj, path) for task_id, obj in task_datas.items()
+                delayed(save_task_file)(task_id, obj, output_path) for task_id, obj in task_datas.items()
             )
         logger.info("\tContinuing to next batch")
         logger.info("\t{}".format("-" * 25))

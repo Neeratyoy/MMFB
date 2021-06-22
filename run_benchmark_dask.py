@@ -9,12 +9,12 @@ import argparse
 import itertools
 import numpy as np
 from loguru import logger
-from distributed import Client
 from typing import Dict, Tuple
+from distributed import Client
 from pympler.asizeof import asizeof
 
 from benchmark import RandomForestBenchmark
-from utils.util import get_parameter_grid, map_to_config
+from utils.util import get_parameter_grid, map_to_config, DaskHelper
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -64,6 +64,8 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     fidelity_hash = config2hash(fidelity)
     seed = evaluation["seed"]
     path = evaluation["path"]
+    task_path = os.path.join(path, str(task_id))
+    os.makedirs(task_path, exist_ok=True)
 
     if benchmarks is None:
         benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
@@ -77,87 +79,10 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
          seed): benchmark.objective(config, fidelity)
     }
     # file_collator should collect the pickle files dumped below
-    name = "{}/{}_{}_{}_{}.pkl".format(path, task_id, config_hash, fidelity_hash, seed)
+    name = "{}/{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed)
     with open(name, 'wb') as f:
         pickle.dump(result, f)
     return "success"
-
-
-class DaskHelper:
-    """ Manages Dask client and provides associated helper functions.
-    """
-    def __init__(self, n_workers=1, client=None):
-        if client is not None and isinstance(client, Client):
-            self.client = client
-            self.n_workers = len(self.client.ncores())
-        else:
-            self.n_workers = n_workers
-            self.client = Client(
-                n_workers=self.n_workers,
-                processes=True,
-                threads_per_worker=1,
-                scheduler_port=0
-            )
-        self.futures = []
-        self.shared_data = None
-
-    def __getstate__(self):
-        """ Allows the object to picklable while having Dask client as a class attribute.
-        """
-        d = dict(self.__dict__)
-        d["client"] = None  # hack to allow Dask client to be a class attribute
-        return d
-
-    def __del__(self):
-        """ Ensures a clean kill of the Dask client and frees up a port.
-        """
-        if hasattr(self, "client") and isinstance(self, Client):
-            self.client.close()
-
-    def submit_job(self, func, x):
-        if self.shared_data is not None:
-            self.futures.append(self.client.submit(func, x, self.shared_data))
-        else:
-            self.futures.append(self.client.submit(func, x))
-
-    def is_worker_available(self, verbose=False):
-        """ Checks if at least one worker is available to run a job
-        """
-        if self.n_workers == 1:
-            # in the synchronous case, one worker is always available
-            return True
-        workers = len(self.client.ncores())
-        if len(self.futures) >= workers:
-            # pause/wait if active worker count greater allocated workers
-            return False
-        return True
-
-    def fetch_futures(self, retries=1, wait_time=0.05):
-        """ Removes the futures which are done from the list
-
-        Loops over the list a given number of times, waiting for a given time, to check if any or
-        more futures have finished. If at any time, all futures have been processed, it breaks out.
-        """
-        counter = 0
-        while counter < retries:
-            if self.n_workers > 1:
-                self.futures = [future for future in self.futures if not future.done()]
-                if len(self.futures) == 0:
-                    break
-            else:
-                # Dask not invoked in the synchronous case (n_workers=1)
-                self.futures = []
-            time.sleep(wait_time)
-            counter += 1
-        return None
-
-    def distribute_data_to_workers(self, data):
-        """ Shares data across all workers to not serialize and transfer with every job
-        """
-        self.shared_data = self.client.scatter(data, broadcast=True)
-
-    def is_worker_alive(self):
-        return len(self.futures) > 0
 
 
 def input_arguments():
@@ -172,7 +97,7 @@ def input_arguments():
         "--task_id",
         default=None,
         type=int,
-        help="The taks_id to run from the AutoML benchmark suite"
+        help="The task_id to run from the AutoML benchmark suite"
     )
     parser.add_argument(
         "--x_grid_size",
@@ -195,9 +120,10 @@ def input_arguments():
         default=0,
         type=int,
         help="Choice of fidelity space:\n"
-             "0: Both number of trees (n_estimators) and dataset subset fraction (subsample)\n"
-             "1: n_estimators as fidelity with dataset subset fraction fixed (subsample=1)\n"
-             "2: subsample as fidelity with number of trees fixed (n_estimators=100)"
+             "0 : the black-box setup with max. fidelites (n_estimators=100; subsample=1\n"
+             "1 : n_estimators as fidelity with dataset subset fraction fixed (subsample=1)\n"
+             "2 : subsample as fidelity with number of trees fixed (n_estimators=100)\n"
+             ">2: Both number of trees (n_estimators) and dataset subset fraction (subsample)"
     )
     parser.add_argument(
         "--n_seeds",
@@ -219,7 +145,7 @@ def input_arguments():
     )
     parser.add_argument(
         "--output_path",
-        default="./dump",
+        default="./tmp_dump",
         type=str,
         help="The directory to dump and store results and benchmark files."
     )
@@ -261,7 +187,7 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
 
     # Creating storage directory
-    path = os.path.join(os.getcwd(), args.output_path)
+    path = os.path.join(os.getcwd(), args.output_path, str(args.fidelity_choice))
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
     os.makedirs("{}/dump".format(path), exist_ok=True)
@@ -302,14 +228,14 @@ if __name__ == "__main__":
     x_cs = benchmark.x_cs
     logger.info("Populating grid for observation space...")
     grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=False)
-    logger.info("{} unique configurations generated".format(len(grid_config)))
+    logger.info("{} unique observations generated".format(len(grid_config)))
     logger.debug("Observation space grid size: {:.2f} MB".format(asizeof(grid_config) / 1024 ** 2))
 
     # Retrieving fidelity spaces and populating grid
     z_cs = benchmark.z_cs
     logger.info("Populating grid for fidelity space...")
     grid_fidelity = get_parameter_grid(z_cs, args.z_grid_size, convert_to_configspace=False)
-    logger.info("{} unique configurations generated".format(len(grid_fidelity)))
+    logger.info("{} unique fidelity configurations generated".format(len(grid_fidelity)))
     logger.debug("Fidelity space grid size: {:.2f} MB".format(asizeof(grid_fidelity) / 1024 ** 2))
 
     # Dask initialisation
@@ -351,18 +277,21 @@ if __name__ == "__main__":
         # next combination to be submitted if client.is_worker_available() is True
         while True:
             if client.is_worker_available():
-                # benchmarks should be provided as a second argument to compute() by dask
+                # benchmarks should be provided as a second argument to compute() by dask as
+                # the benchmarks are already distributed across the workers
                 client.submit_job(compute, return_dict(combination))
                 break
             else:
                 client.fetch_futures(retries=1, wait_time=0.05)
     if num_workers > 1 and client.is_worker_alive():
         logger.info("Waiting for pending workers...")
-    while num_workers > 1 and client.is_worker_alive():
-        client.fetch_futures(retries=1, wait_time=0.05)
+        while num_workers > 1 and client.is_worker_alive():
+            client.fetch_futures(retries=1, wait_time=0.05)
     end = time.time()
 
-    logger.info("{} unique configurations evaluated on {} different fidelity combinations for {} "
-                "seeds on {} different tasks in {:.2f} seconds".format(
-        len(grid_config), len(grid_fidelity), args.n_seeds, args.n_tasks, end - start
-    ))
+    logger.info(
+        "{} unique configurations evaluated on {} different fidelity combinations for {} "
+        "seeds on {} different tasks in {:.2f} seconds".format(
+            len(grid_config), len(grid_fidelity), args.n_seeds, args.n_tasks, end - start
+        )
+    )

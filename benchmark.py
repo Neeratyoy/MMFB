@@ -18,7 +18,9 @@ from sklearn.metrics import accuracy_score, make_scorer
 class RandomForestBenchmark:
     _issue_tasks = [3917, 3945]
 
-    def __init__(self, task_id=None, valid_size=0.33, seed=None, fidelity_choice=0):
+    def __init__(self, task_id=None, valid_size=0.33, seed=None, fidelity_choice=3,
+                 benchmark_type="raw"):
+        self.benchmark_type = benchmark_type
         self.task_id = task_id
         self.valid_size = valid_size
         self.seed = seed
@@ -57,9 +59,22 @@ class RandomForestBenchmark:
 
     def get_fidelity_space(self, fidelity_choice):
         """Fidelity space available --- specifies the fidelity dimensions
+
+        If fidelity_choice is 0
+            Fidelity space is the maximal fidelity, akin to a black-box function
+        If fidelity_choice is 1
+            Fidelity space is a single fidelity, in this case the number of trees (n_estimators)
+        If fidelity_choice is 2
+            Fidelity space is a single fidelity, in this case the fraction of dataset (subsample)
+        If fidelity_choice is >2
+            Fidelity space is multi-multi fidelity, all possible fidelities
         """
         f_cs = CS.ConfigurationSpace(seed=self.seed)
-        if fidelity_choice == 1:
+        if fidelity_choice == 0:
+            # only subsample as fidelity
+            ntrees = CS.Constant('n_estimators', value=100)
+            subsample = CS.Constant('subsample', value=1)
+        elif fidelity_choice == 1:
             # only n_estimators as fidelity
             ntrees = CS.UniformIntegerHyperparameter(
                 'n_estimators', lower=2, upper=100, default_value=10, log=False
@@ -184,7 +199,7 @@ class RandomForestBenchmark:
                                                       self.test_y.shape))
             print("\nData loading complete!\n")
 
-    def _objective(self, config, fidelity):
+    def _raw_objective(self, config, fidelity):
         start = time.time()
 
         # initializing model
@@ -206,7 +221,7 @@ class RandomForestBenchmark:
         accuracy_scorer = make_scorer(accuracy_score)
 
         val_loss = 1 - accuracy_scorer(model, self.valid_X, self.valid_y)
-        # TODO: should training loss be on the subsampled data ??
+        #TODO: should training loss be on the subsampled data??
         train_loss = 1 - accuracy_scorer(model, self.train_X, self.train_y)
         test_loss = 1 - accuracy_scorer(model, self.test_X, self.test_y)
 
@@ -226,7 +241,11 @@ class RandomForestBenchmark:
     def objective(self, config, fidelity):
         """Function that evaluates a 'config' on a 'fidelity' on the validation set
         """
-        info = self._objective(config, fidelity)
+        if self.benchmark_type == "raw":
+            info = self._raw_objective(config, fidelity)
+        else:
+            #TODO: add cases for `tabular` and `surrogate` benchmarks
+            pass
 
         return {
             'function_value': info['val_loss'],
@@ -236,7 +255,13 @@ class RandomForestBenchmark:
     def objective_test(self, config, fidelity):
         """Function that evaluates a 'config' on a 'fidelity' on the test set
         """
-        info = self._objective(config, fidelity)
+        if self.benchmark_type == "raw":
+            info = self._raw_objective(config, fidelity)
+        else:
+            #TODO: add cases for `tabular` and `surrogate` benchmarks
+            pass
+
+        info = self._raw_objective(config, fidelity)
 
         return {
             'function_value': info['test_loss'],
