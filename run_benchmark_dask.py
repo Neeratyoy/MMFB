@@ -14,8 +14,9 @@ from distributed import Client
 from pympler.asizeof import asizeof
 
 sys.path.append(os.path.join(os.getcwd(), "../HPOBench"))
-# from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
-from benchmark import RandomForestBenchmark
+from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
+from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
+# from benchmark import RandomForestBenchmark
 from utils.util import get_parameter_grid, map_to_config, DaskHelper
 
 
@@ -25,6 +26,11 @@ _logger_props = {
     "enqueue": True,
     "rotation": "500 MB"
 }
+
+param_space_dict = dict(
+    rf=RandomForestBenchmark,
+    svm=SVMBenchmark
+)
 
 
 def config2hash(config):
@@ -69,10 +75,7 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     task_path = os.path.join(path, str(task_id))
     os.makedirs(task_path, exist_ok=True)
 
-    if benchmarks is None:
-        benchmark = RandomForestBenchmark(task_id=task_id, seed=seed)
-    else:
-        benchmark = benchmarks[task_id][seed]
+    benchmark = benchmarks[task_id][seed]
     # the lookup dict key for each evaluation is a 4-element tuple
     result = {
         (task_id,
@@ -89,6 +92,13 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
 
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument(
+        "--space",
+        default="rf",
+        type=str,
+        choices=["rf", "svm"],
+        help="The number of tasks to run data collection on from the AutoML benchmark suite"
+    )
     parser.add_argument(
         "--n_tasks",
         default=None,
@@ -165,6 +175,9 @@ if __name__ == "__main__":
 
     args = input_arguments()
 
+    # Choosing parameter space
+    param_space = param_space_dict[args.space]
+
     # Task input check
     automl_benchmark = openml.study.get_suite(218)
     task_ids = automl_benchmark.tasks
@@ -189,7 +202,7 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
 
     # Creating storage directory
-    path = os.path.join(os.getcwd(), args.output_path, str(args.fidelity_choice))
+    path = os.path.join(os.getcwd(), args.output_path, args.space, str(args.fidelity_choice))
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
     os.makedirs("{}/dump".format(path), exist_ok=True)
@@ -219,7 +232,7 @@ if __name__ == "__main__":
         benchmarks[task_id] = dict()
         for seed in seeds:
             logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
-            benchmarks[task_id][seed] = RandomForestBenchmark(
+            benchmarks[task_id][seed] = param_space(
                 task_id=task_id, seed=seed, fidelity_choice=args.fidelity_choice
             )
             benchmarks[task_id][seed].load_data_from_openml()
