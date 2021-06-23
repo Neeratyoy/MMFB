@@ -13,6 +13,8 @@ from typing import Dict, Tuple
 from distributed import Client
 from pympler.asizeof import asizeof
 
+sys.path.append(os.path.join(os.getcwd(), "../HPOBench"))
+# from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 from benchmark import RandomForestBenchmark
 from utils.util import get_parameter_grid, map_to_config, DaskHelper
 

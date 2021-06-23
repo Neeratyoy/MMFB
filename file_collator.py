@@ -79,6 +79,7 @@ if __name__ == "__main__":
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
     dump_path = os.path.join(path, "dump")
+    os.makedirs(dump_path, exist_ok=True)
     output_path = os.path.join(path, "benchmark")
     os.makedirs(output_path, exist_ok=True)
 
@@ -97,6 +98,8 @@ if __name__ == "__main__":
     while True:
         # list available tasks
         task_ids = [int(tid) for tid in os.listdir(dump_path)]
+        if len(task_ids) == 0:
+            continue
         batch_size = args.max_batch_size // len(task_ids)
 
         # collect all files in the directory
@@ -104,6 +107,8 @@ if __name__ == "__main__":
         for tid in task_ids:
             _file_list = os.listdir(os.path.join(dump_path, str(tid)))[:batch_size]
             file_list.extend([os.path.join(str(tid), f) for f in _file_list])
+        # shuffling allows progress of data collection across runs for all datasets available
+        np.random.shuffle(file_list)
         logger.info("\tSnapshot taken from directory --> {} files found!".format(len(file_list)))
         logger.info("\tsleeping...")
 
