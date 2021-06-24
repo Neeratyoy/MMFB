@@ -14,8 +14,10 @@ from distributed import Client
 from pympler.asizeof import asizeof
 
 sys.path.append(os.path.join(os.getcwd(), "../HPOBench"))
-from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
+from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
+from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
+
 from utils.util import get_parameter_grid, map_to_config, DaskHelper
 
 
@@ -28,7 +30,8 @@ _logger_props = {
 
 param_space_dict = dict(
     rf=RandomForestBenchmark,
-    svm=SVMBenchmark
+    svm=SVMBenchmark,
+    histgb=HistGBBenchmark
 )
 
 
@@ -95,7 +98,7 @@ def input_arguments():
         "--space",
         default="rf",
         type=str,
-        choices=["rf", "svm"],
+        choices=["rf", "svm", "histgb"],
         help="The number of tasks to run data collection on from the AutoML benchmark suite"
     )
     parser.add_argument(
