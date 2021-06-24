@@ -9,7 +9,7 @@ import numpy as np
 
 path = '/'.join(__file__.split('/')[:-2])
 sys.path.append(path)
-from benchmark import RandomForestBenchmark
+from rf_benchmark import RandomForestBenchmark
 
 
 if __name__ == "__main__":

@@ -16,7 +16,6 @@ from pympler.asizeof import asizeof
 sys.path.append(os.path.join(os.getcwd(), "../HPOBench"))
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
-# from benchmark import RandomForestBenchmark
 from utils.util import get_parameter_grid, map_to_config, DaskHelper
 
 
