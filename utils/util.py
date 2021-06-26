@@ -1,6 +1,7 @@
 import time
 import itertools
 import numpy as np
+import pandas as pd
 import ConfigSpace as CS
 from distributed import Client
 from typing import Union, List, Tuple
@@ -71,6 +72,15 @@ def get_parameter_grid(
     for _config in full_grid:
         config_list.append(map_to_config(cs, _config))
     return config_list
+
+
+def get_discrete_configspace(configspace, grid_size=10, seed=None):
+    grid_list = pd.DataFrame(get_parameter_grid(configspace, grid_size))
+    cs = CS.ConfigurationSpace(seed=seed)
+    hp_names = np.sort(configspace.get_hyperparameter_names()).tolist()
+    for i, k in enumerate(hp_names):
+        cs.add_hyperparameter(CS.OrdinalHyperparameter(str(k), grid_list.iloc[:, i].unique()))
+    return cs
 
 
 class DaskHelper:
