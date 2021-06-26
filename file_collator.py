@@ -53,17 +53,6 @@ def update_table_with_new_entry(main_data, new_entry, config, fidelity):
 
 def save_task_file(task_id, task_dict, path):
     obj = task_dict
-    # if os.path.isfile(os.path.join(path, "task_{}.pkl".format(task_id))):
-    #     # if file exists, read the file, append, write
-    #     with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'rb') as f:
-    #         data = pickle.load(f)
-    #     # with time `data` will be larger in size than `obj`
-    #     for _config in obj.keys():
-    #         for _fidelity in obj[_config].keys():
-    #             for _seed in obj[_config][_fidelity].keys():
-    #                 _data = {_config: {_fidelity: {_seed: obj[_config][_fidelity][_seed]}}}
-    #                 data = update_table_with_new_entry(data, _data)
-    #     obj = data
     with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
         pickle.dump(obj, f)
     return
