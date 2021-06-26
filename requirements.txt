@@ -6,3 +6,4 @@ openml>=0.11
 dask[complete]>=2.25.0
 loguru>=0.5.3
 pympler>=0.9
+glom>=20.11.0

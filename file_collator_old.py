@@ -3,15 +3,10 @@ import sys
 import time
 import pickle
 import argparse
-
-import glom
 import numpy as np
 from copy import deepcopy
 from loguru import logger
-from collections import OrderedDict
 from joblib.parallel import Parallel, parallel_backend, delayed
-
-from utils.util import map_to_config
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -33,37 +28,36 @@ def retrieve_task_ids(filenames):
     return np.unique(task_ids)
 
 
-def update_table_with_new_entry(main_data, new_entry, config, fidelity):
-    seed = res['info']['seed']
-    key_nest = []
-    for k, v in config.items():
-        key_nest.append(v)
-        if glom.glom(main_data, glom.Path(*key_nest), default=None) is None:
-            glom.assign(main_data, glom.Path(*key_nest), dict())
-    for k, v in fidelity.items():
-        key_nest.append(v)
-        if glom.glom(main_data, glom.Path(*key_nest), default=None) is None:
-            glom.assign(main_data, glom.Path(*key_nest), dict())
-    key_nest.append(seed)
-    if glom.glom(main_data, glom.Path(*key_nest), default=None) is None:
-        glom.assign(main_data, glom.Path(*key_nest), dict())
-    glom.assign(main_data, glom.Path(*key_nest), new_entry)
+def update_table_with_new_entry(main_data, new_entry):
+    config_hash = list(new_entry.keys())[0]
+    fidelity_hash = list(new_entry[config_hash].keys())[0]
+    seed = list(new_entry[config_hash][fidelity_hash].keys())[0]
+    if config_hash not in main_data.keys():
+        main_data.update(new_entry)
+    elif fidelity_hash not in main_data[config_hash].keys():
+        main_data[config_hash].update(new_entry[config_hash])
+    elif seed not in main_data[config_hash][fidelity_hash].keys():
+        main_data[config_hash][fidelity_hash].update(new_entry[config_hash][fidelity_hash])
+    else:
+        main_data[config_hash][fidelity_hash][seed].update(
+            new_entry[config_hash][fidelity_hash][seed]
+        )
     return main_data
 
 
 def save_task_file(task_id, task_dict, path):
     obj = task_dict
-    # if os.path.isfile(os.path.join(path, "task_{}.pkl".format(task_id))):
-    #     # if file exists, read the file, append, write
-    #     with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'rb') as f:
-    #         data = pickle.load(f)
-    #     # with time `data` will be larger in size than `obj`
-    #     for _config in obj.keys():
-    #         for _fidelity in obj[_config].keys():
-    #             for _seed in obj[_config][_fidelity].keys():
-    #                 _data = {_config: {_fidelity: {_seed: obj[_config][_fidelity][_seed]}}}
-    #                 data = update_table_with_new_entry(data, _data)
-    #     obj = data
+    if os.path.isfile(os.path.join(path, "task_{}.pkl".format(task_id))):
+        # if file exists, read the file, append, write
+        with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'rb') as f:
+            data = pickle.load(f)
+        # with time `data` will be larger in size than `obj`
+        for _config in obj.keys():
+            for _fidelity in obj[_config].keys():
+                for _seed in obj[_config][_fidelity].keys():
+                    _data = {_config: {_fidelity: {_seed: obj[_config][_fidelity][_seed]}}}
+                    data = update_table_with_new_entry(data, _data)
+        obj = data
     with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
         pickle.dump(obj, f)
     return
@@ -73,8 +67,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--sleep", type=int, default=10, help="Sleep in seconds")
-    parser.add_argument("--path", type=str, default="./tmp_dump",
-                        help="Directory for files for a fidelity choice")
+    parser.add_argument("--path", type=str, default="./tmp_dump", help="Directory for files")
     parser.add_argument("--max_batch_size", type=int, default=100000,
                         help="The number of files to process per loop iteration")
     parser.add_argument("--n_jobs", type=int, default=1,
@@ -82,22 +75,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     sleep_wait = args.sleep
-
-    # Creating storage directories
     path = args.path
-    base_path = os.path.join(path, "..")
+    os.makedirs(path, exist_ok=True)
+    os.makedirs("{}/logs".format(path), exist_ok=True)
     dump_path = os.path.join(path, "dump")
+    os.makedirs(dump_path, exist_ok=True)
     output_path = os.path.join(path, "benchmark")
     os.makedirs(output_path, exist_ok=True)
-
-    while not os.path.isfile(os.path.join(base_path, "param_space.pkl")) and \
-            not os.path.isfile(os.path.join(path, "param_space.pkl")):
-        time.sleep(sleep_wait)
-
-    with open(os.path.join(base_path, "param_space.pkl"), "rb") as f:
-        x_cs = pickle.load(f)
-    with open(os.path.join(path, "param_space.pkl"), "rb") as f:
-        z_cs = pickle.load(f)
 
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
@@ -110,7 +94,6 @@ if __name__ == "__main__":
 
     initial_file_list = os.listdir(path)
     file_count = 0
-    task_datas = dict()
 
     while True:
         # list available tasks
@@ -134,10 +117,9 @@ if __name__ == "__main__":
 
         _task_ids = retrieve_task_ids(file_list)
         logger.info("\tTask IDs found: {}".format(_task_ids))
-
+        task_datas = dict()
         for tid in _task_ids:
-            if tid not in task_datas.keys():
-                task_datas[tid] = dict()
+            task_datas[tid] = dict()
 
         start = time.time()
         logger.info("\tStarting collection...")
@@ -156,34 +138,22 @@ if __name__ == "__main__":
                 # if file was collected with os.listdir but deleted in the meanwhile, ignore it
                 continue
 
-            # for k, v in res.items():
-            #     task_id, config_hash, fidelity_hash, seed = k
-            #     # structure of how records are saved to disk to allow quick lookups
-            #     # each dict object is associated to a fixed task_id
-            #     # each such task will have a list of configurations stored with their md5 hash
-            #     # each config under each task will have all the fidelities it was evaluated on
-            #     # each task-config-fidelity would have been evaluated on a different seed
-            #     obj = {
-            #         config_hash: {
-            #             fidelity_hash: {
-            #                 seed: v
-            #             }
-            #         }
-            #     }
-            #     task_datas[task_id] = update_table_with_new_entry(task_datas[task_id], obj)
-            #     file_count += 1
-
-            # config = map_to_config(x_cs, list(res['info']['config'].values()))
-            config = OrderedDict(res['info']['config'])
-            # fidelity = map_to_config(z_cs, list(res['info']['fidelity'].values()))
-            fidelity = OrderedDict(res['info']['fidelity'])
-            res['info'].pop('config')
-            res['info'].pop('fidelity')
-            task_id = int(filename.split('/')[0].split('_')[0])
-            task_datas[task_id] = update_table_with_new_entry(
-                task_datas[task_id], res, config, fidelity
-            )
-            file_count += 1
+            for k, v in res.items():
+                task_id, config_hash, fidelity_hash, seed = k
+                # structure of how records are saved to disk to allow quick lookups
+                # each dict object is associated to a fixed task_id
+                # each such task will have a list of configurations stored with their md5 hash
+                # each config under each task will have all the fidelities it was evaluated on
+                # each task-config-fidelity would have been evaluated on a different seed
+                obj = {
+                    config_hash: {
+                        fidelity_hash: {
+                            seed: v
+                        }
+                    }
+                }
+                task_datas[task_id] = update_table_with_new_entry(task_datas[task_id], obj)
+                file_count += 1
 
             try:
                 # deleting data file that was processed

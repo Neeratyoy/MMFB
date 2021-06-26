@@ -79,12 +79,17 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
 
     benchmark = benchmarks[task_id][seed]
     # the lookup dict key for each evaluation is a 4-element tuple
-    result = {
-        (task_id,
-         config2hash(config),
-         config2hash(fidelity),
-         seed): benchmark.objective(config, fidelity)
-    }
+    result = benchmark.objective(config, fidelity)
+    result['info']['seed'] = seed
+    # result = {
+    #     (task_id,
+    #      config2hash(config),
+    #      config2hash(fidelity),
+    #      seed): res
+    # }
+    # result = {
+    #     benchmark.objective(config, fidelity)
+    # }
     # file_collator should collect the pickle files dumped below
     name = "{}/{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed)
     with open(name, 'wb') as f:
@@ -203,13 +208,17 @@ if __name__ == "__main__":
     # Setting seed
     np.random.seed(args.seed)
 
-    # Creating storage directory
-    path = os.path.join(os.getcwd(), args.output_path, args.space, str(args.fidelity_choice))
+    # Creating storage directories0.325,
+    base_path = os.path.join(os.getcwd(), args.output_path, args.space)
+    path = os.path.join(base_path, str(args.fidelity_choice))
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
     os.makedirs("{}/dump".format(path), exist_ok=True)
     dump_path = os.path.join(path, "dump")
     os.makedirs(dump_path, exist_ok=True)
+
+    print("Base Path: ", base_path)
+    print("Path: ", path)
 
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
@@ -240,6 +249,12 @@ if __name__ == "__main__":
             benchmarks[task_id][seed].load_data_from_openml()
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = benchmarks[task_ids[0]][seeds[0]]
+
+    # Saving a copy of the ConfigSpaces used for this run
+    with open(os.path.join(base_path, "param_space.pkl"), "wb") as f:
+        pickle.dump(benchmark.x_cs, f)
+    with open(os.path.join(path, "param_space.pkl"), "wb") as f:
+        pickle.dump(benchmark.z_cs, f)
 
     # Retrieving observation space and populating grid
     x_cs = benchmark.x_cs
