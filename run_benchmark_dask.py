@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import yaml
 import openml
 import pickle
 import hashlib
@@ -8,17 +9,18 @@ import warnings
 import argparse
 import itertools
 import numpy as np
+import yaml
 from loguru import logger
 from typing import Dict, Tuple
 from distributed import Client
 from pympler.asizeof import asizeof
 
-sys.path.append(os.path.join(os.getcwd(), "../HPOBench"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../HPOBench"))
 from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 
-from utils.util import get_parameter_grid, map_to_config, DaskHelper
+from utils.util import get_parameter_grid, map_to_config, DotDict, DaskHelper
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -81,15 +83,6 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     # the lookup dict key for each evaluation is a 4-element tuple
     result = benchmark.objective(config, fidelity)
     result['info']['seed'] = seed
-    # result = {
-    #     (task_id,
-    #      config2hash(config),
-    #      config2hash(fidelity),
-    #      seed): res
-    # }
-    # result = {
-    #     benchmark.objective(config, fidelity)
-    # }
     # file_collator should collect the pickle files dumped below
     name = "{}/{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed)
     with open(name, 'wb') as f:
@@ -97,8 +90,27 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     return "success"
 
 
+def load_yaml_args(filename):
+    with open(filename, "r") as f:
+        # https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation
+        args = yaml.load(f, Loader=yaml.FullLoader)
+    return DotDict(args)
+
+
+def dump_yaml_args(args, filename):
+    with open(filename, "w") as f:
+        f.writelines(yaml.dump(args))
+    return
+
+
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument(
+        "--config",
+        default=None,
+        type=str,
+        help="The complete filepath to a config file, which if present, overrides cmd arguments"
+    )
     parser.add_argument(
         "--space",
         default="rf",
@@ -174,6 +186,13 @@ def input_arguments():
         type=int,
         help="The seed for the complete benchmark collection"
     )
+    parser.add_argument(
+        "--exp_name",
+        default=None,
+        type=str,
+        help="Creates an experiment directory and if script executed with cmd arguments, "
+             "dumps an yaml file with the arguments at the same level"
+    )
     args = parser.parse_args()
     return args
 
@@ -181,6 +200,12 @@ def input_arguments():
 if __name__ == "__main__":
 
     args = input_arguments()
+    if args.config is not None and os.path.isfile(args.config):
+        args = load_yaml_args(args.config)
+        exp_name = None
+    if args.config is None and args.exp_name is not None:
+        exp_name = args.exp_name
+        args.output_path = os.path.join(args.output_path, args.exp_name)
 
     # Choosing parameter space
     param_space = param_space_dict[args.space]
@@ -208,15 +233,17 @@ if __name__ == "__main__":
     # Setting seed
     np.random.seed(args.seed)
 
-    # Creating storage directories0.325,
+    # Creating storage directories
     base_path = os.path.join(os.getcwd(), args.output_path, args.space)
+    os.makedirs(base_path, exist_ok=True)
+    if exp_name is not None:
+        dump_yaml_args(args.__dict__, os.path.join(base_path, "{}_args.yaml".format(args.exp_name)))
     path = os.path.join(base_path, str(args.fidelity_choice))
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
     os.makedirs("{}/dump".format(path), exist_ok=True)
     dump_path = os.path.join(path, "dump")
     os.makedirs(dump_path, exist_ok=True)
-
     print("Base Path: ", base_path)
     print("Path: ", path)
 

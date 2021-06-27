@@ -1,0 +1,13 @@
+space: "svm"
+n_tasks: 2
+x_grid_size: 10
+z_grid_size: 10
+fidelity_choice: 1
+n_seeds: 3
+output_path: "./tmp_dump"
+n_workers: 3
+# Placeholders with default values
+task_id: null
+scheduler_file: null
+seed: 1234
+exp_name: null
