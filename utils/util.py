@@ -74,7 +74,28 @@ def get_parameter_grid(
     return config_list
 
 
-def get_discrete_configspace(configspace, grid_size=10, seed=None):
+def get_discrete_configspace(
+        configspace: CS.ConfigurationSpace,
+        grid_size: int=10,
+        seed: Union[int, None]=None
+):
+    """ Generates a new discretized ConfigurationSpace from a generally defined space
+
+    Given the discretization grid size for each dimension, the new ConfigurationSpace contains
+    each hyperparmater as an OrdinalParameter with the discretized values for that dimension as the
+    sequence of choices available for that hyperparameter.
+
+    Parameters
+    ----------
+    configspace : ConfigSpace.ConfigurationSpace
+    grid_size : int
+        The number of steps to divide a parameter dimension into
+    seed : int
+
+    Returns
+    -------
+    ConfigSpace.ConfigurationSpace
+    """
     grid_list = pd.DataFrame(get_parameter_grid(configspace, grid_size))
     cs = CS.ConfigurationSpace(seed=seed)
     hp_names = np.sort(configspace.get_hyperparameter_names()).tolist()
