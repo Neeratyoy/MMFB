@@ -7,6 +7,7 @@ n_seeds: 3
 output_path: "./tmp_dump"
 n_workers: 3
 # Placeholders with default values
-task_id: None
-scheduler_file: None
+task_id: null
+scheduler_file: null
 seed: 1234
+exp_name: null
