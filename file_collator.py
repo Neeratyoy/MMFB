@@ -144,27 +144,8 @@ if __name__ == "__main__":
             except FileNotFoundError:
                 # if file was collected with os.listdir but deleted in the meanwhile, ignore it
                 continue
-
-            # for k, v in res.items():
-            #     task_id, config_hash, fidelity_hash, seed = k
-            #     # structure of how records are saved to disk to allow quick lookups
-            #     # each dict object is associated to a fixed task_id
-            #     # each such task will have a list of configurations stored with their md5 hash
-            #     # each config under each task will have all the fidelities it was evaluated on
-            #     # each task-config-fidelity would have been evaluated on a different seed
-            #     obj = {
-            #         config_hash: {
-            #             fidelity_hash: {
-            #                 seed: v
-            #             }
-            #         }
-            #     }
-            #     task_datas[task_id] = update_table_with_new_entry(task_datas[task_id], obj)
-            #     file_count += 1
-
-            # config = map_to_config(x_cs, list(res['info']['config'].values()))
+            
             config = OrderedDict(res['info']['config'])
-            # fidelity = map_to_config(z_cs, list(res['info']['fidelity'].values()))
             fidelity = OrderedDict(res['info']['fidelity'])
             res['info'].pop('config')
             res['info'].pop('fidelity')
@@ -177,7 +158,6 @@ if __name__ == "__main__":
             try:
                 # deleting data file that was processed
                 os.remove(os.path.join(dump_path, filename))
-                # os.remove(os.path.join(dump_path, filename))
             except FileNotFoundError:
                 continue
 
