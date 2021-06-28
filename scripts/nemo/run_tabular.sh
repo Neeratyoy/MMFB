@@ -22,6 +22,8 @@ config=$codedir"/arguments/"$runtype/$model"_args.yaml"
 echo "Collecting "$runtype" benchmark for "$model" space"
 echo "Loading args from "$config
 
+source $HOME/miniconda3/bin/activate mmfb
+
 # setting path variables to allow relative imports to work
 export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
