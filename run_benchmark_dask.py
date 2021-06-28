@@ -15,7 +15,6 @@ from typing import Dict, Tuple
 from distributed import Client
 from pympler.asizeof import asizeof
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../HPOBench"))
 from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
@@ -200,9 +199,10 @@ def input_arguments():
 if __name__ == "__main__":
 
     args = input_arguments()
+
+    exp_name = None
     if args.config is not None and os.path.isfile(args.config):
         args = load_yaml_args(args.config)
-        exp_name = None
     if args.config is None and args.exp_name is not None:
         exp_name = args.exp_name
         args.output_path = os.path.join(args.output_path, args.exp_name)
@@ -303,6 +303,7 @@ if __name__ == "__main__":
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
         num_workers = client.n_workers
+        client.distribute_data_to_workers(benchmarks)
         logger.info("Dask Client information: {}".format(client.client))
     else:
         num_workers = args.n_workers

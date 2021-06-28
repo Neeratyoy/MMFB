@@ -5,9 +5,8 @@ z_grid_size: 5
 fidelity_choice: 1
 n_seeds: 3
 output_path: "./tmp_dump"
-n_workers: 3
-# Placeholders with default values
+n_workers: null
 task_id: null
-scheduler_file: null
+scheduler_file: ./tmp_dump/scheduler.json
 seed: 1234
 exp_name: null
