@@ -11,4 +11,4 @@ wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
 export PYTHONPATH=$PWD:$PYTHONPATH
 
-PYTHONPATH=$PWD python3 file_collator.sh --sleep 10 --path $wspace
+PYTHONPATH=$PWD python3 $codedir/file_collator.sh --sleep 10 --path $wspace

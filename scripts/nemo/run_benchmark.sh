@@ -9,4 +9,4 @@
 codedir=$HOME'/Thesis/code/MMFB'
 wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
-bash scripts/run_tabular.sh rf toy
+bash $codedir/scripts/run_tabular.sh rf toy

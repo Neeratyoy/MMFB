@@ -6,10 +6,10 @@
 #MSUB -o /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
 #MSUB -e /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
 
-nworkers=6
+nworkers=128
 codedir=$HOME'/Thesis/code/MMFB'
 wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
 source $HOME/miniconda3/bin/activate mmfb
 
-bash scripts/dask/deploy_workers.sh $nworkers $codedir/tmp_dump/scheduler.json $wspace
+bash $codedir/scripts/dask/deploy_workers.sh $nworkers $codedir/tmp_dump/scheduler.json $wspace
