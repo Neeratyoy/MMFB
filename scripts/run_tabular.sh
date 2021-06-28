@@ -1,5 +1,10 @@
 #! /bin/bash
 
+# This script is designed to work locally
+# This script can be executed as is on a cluster, however, the $PWD variable
+# needs to be taken care of then depending on the cluster mechanism.
+# The script under scripts/nemo with the same name does so.
+
 model=$1
 runtype=$2
 

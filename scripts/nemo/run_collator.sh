@@ -9,6 +9,6 @@
 codedir=$HOME'/Thesis/code/MMFB'
 wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
-export PYTHONPATH=$PWD:$PYTHONPATH
+export PYTHONPATH=$codedir:$PYTHONPATH
 
-PYTHONPATH=$PWD python3 $codedir/file_collator.sh --sleep 10 --path $wspace
+PYTHONPATH=$codedir python3 $codedir/file_collator.py --sleep 10 --path $wspace
