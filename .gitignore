@@ -5,6 +5,8 @@ __pycache__/
 dask-worker-space/
 tmp_dump/
 notebooks/
+*_dump/
+logs/
 
 # files
 *.pkl
