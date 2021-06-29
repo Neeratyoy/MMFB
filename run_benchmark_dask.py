@@ -18,7 +18,7 @@ from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 
-from utils.util import get_parameter_grid, map_to_config, DotDict, DaskHelper
+from utils.util import get_parameter_grid, map_to_config, DaskHelper, load_yaml_args, dump_yaml_args
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -86,19 +86,6 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     with open(name, 'wb') as f:
         pickle.dump(result, f)
     return "success"
-
-
-def load_yaml_args(filename):
-    with open(filename, "r") as f:
-        # https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation
-        args = yaml.load(f, Loader=yaml.FullLoader)
-    return DotDict(args)
-
-
-def dump_yaml_args(args, filename):
-    with open(filename, "w") as f:
-        f.writelines(yaml.dump(args))
-    return
 
 
 def input_arguments():

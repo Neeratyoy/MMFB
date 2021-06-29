@@ -1,4 +1,5 @@
 import time
+import yaml
 import itertools
 import numpy as np
 import pandas as pd
@@ -61,10 +62,14 @@ def get_parameter_grid(
         else:
             if hp.log:
                 param_ranges.append(
-                    np.exp(np.linspace(np.log(hp.lower), np.log(hp.upper), grid_step_size))
+                    np.exp(np.linspace(
+                        np.log(hp.lower), np.log(hp.upper), grid_step_size
+                    ).astype(np.float32))
                 )
             else:
-                param_ranges.append(np.linspace(hp.lower, hp.upper, grid_step_size))
+                param_ranges.append(
+                    np.linspace(hp.lower, hp.upper, grid_step_size).astype(np.float32)
+                )
     full_grid = itertools.product(*param_ranges)
     if not convert_to_configspace:
         return list(full_grid)
@@ -100,8 +105,26 @@ def get_discrete_configspace(
     cs = CS.ConfigurationSpace(seed=seed)
     hp_names = np.sort(configspace.get_hyperparameter_names()).tolist()
     for i, k in enumerate(hp_names):
-        cs.add_hyperparameter(CS.OrdinalHyperparameter(str(k), grid_list.iloc[:, i].unique()))
+        choices = grid_list.iloc[:, i].unique()
+        if isinstance(configspace.get_hyperparameter(k), CS.UniformIntegerHyperparameter):
+            choices = choices.astype(int)
+        elif isinstance(configspace.get_hyperparameter(k), CS.UniformFloatHyperparameter):
+            choices = choices.astype(np.float32)
+        cs.add_hyperparameter(CS.OrdinalHyperparameter(str(k), choices))
     return cs
+
+
+def load_yaml_args(filename):
+    with open(filename, "r") as f:
+        # https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation
+        args = yaml.load(f, Loader=yaml.FullLoader)
+    return DotDict(args)
+
+
+def dump_yaml_args(args, filename):
+    with open(filename, "w") as f:
+        f.writelines(yaml.dump(args))
+    return
 
 
 class DotDict(dict):
