@@ -9,7 +9,6 @@ import warnings
 import argparse
 import itertools
 import numpy as np
-import yaml
 from loguru import logger
 from typing import Dict, Tuple
 from distributed import Client

@@ -11,4 +11,7 @@ wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
 source $HOME/miniconda3/bin/activate mmfb
 
+export PYTHONPATH=$codedir:$PYTHONPATH
+export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
+
 bash $codedir/scripts/dask/deploy_scheduler.sh $codedir/tmp_dump/scheduler.json

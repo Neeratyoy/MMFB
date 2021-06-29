@@ -9,8 +9,11 @@
 codedir=$HOME'/Thesis/code/MMFB'
 wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
+path=$1
+
 source $HOME/miniconda3/bin/activate mmfb
 
 export PYTHONPATH=$codedir:$PYTHONPATH
+export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
-PYTHONPATH=$codedir python3 $codedir/file_collator.py --sleep 10 --path $wspace
+PYTHONPATH=$codedir python3 $codedir/file_collator.py --sleep 10 --path $wspace$path
