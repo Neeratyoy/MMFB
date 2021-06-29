@@ -238,7 +238,8 @@ if __name__ == "__main__":
     base_path = os.path.join(os.getcwd(), args.output_path, args.space)
     os.makedirs(base_path, exist_ok=True)
     if exp_name is not None:
-        dump_yaml_args(args.__dict__, os.path.join(base_path, "{}_args.yaml".format(args.exp_name)))
+        filename = os.path.join(base_path, "{}_{}_args.yaml".format(args.exp_name, args.space))
+        dump_yaml_args(args.__dict__, filename)
     path = os.path.join(base_path, str(args.fidelity_choice))
     os.makedirs(path, exist_ok=True)
     os.makedirs("{}/logs".format(path), exist_ok=True)
