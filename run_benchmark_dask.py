@@ -202,8 +202,10 @@ if __name__ == "__main__":
 
     exp_name = None
     if args.config is not None and os.path.isfile(args.config):
+        # if config file provided, load args from it and ignore other cmd args
         args = load_yaml_args(args.config)
     if args.config is None and args.exp_name is not None:
+        # if config file not provided and exp_name provided, dump current cmd args under exp_name
         exp_name = args.exp_name
         args.output_path = os.path.join(args.output_path, args.exp_name)
 

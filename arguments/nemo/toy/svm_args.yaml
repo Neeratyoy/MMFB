@@ -7,6 +7,6 @@ n_seeds: 3
 output_path: "/work/ws/nemo/fr_nm217-hpobench-0/"
 n_workers: null
 task_id: null
-scheduler_file: "/home/fr/fr_fr/fr_nm217/tmp_dump/scheduler.json"
+scheduler_file: "/home/fr/fr_fr/fr_nm217/Thesis/code/MMFB/tmp_dump/scheduler.json"
 seed: 1234
 exp_name: null
