@@ -17,7 +17,7 @@ if [ -z "$runtype" ]
   then
     runtype="toy"
 fi
-config=$codedir"/arguments/"$runtype/$model"_args.yaml"
+config=$codedir"/arguments/nemo/"$runtype/$model"_args.yaml"
 
 echo "Collecting "$runtype" benchmark for "$model" space"
 echo "Loading args from "$config

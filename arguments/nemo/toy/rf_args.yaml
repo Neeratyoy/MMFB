@@ -1,0 +1,12 @@
+space: "rf"
+n_tasks: 2
+x_grid_size: 3
+z_grid_size: 5
+fidelity_choice: 1
+n_seeds: 3
+output_path: "/work/ws/nemo/fr_nm217-hpobench-0/"
+n_workers: null
+task_id: null
+scheduler_file: "/home/fr/fr_fr/fr_nm217/tmp_dump/scheduler.json"
+seed: 1234
+exp_name: null
