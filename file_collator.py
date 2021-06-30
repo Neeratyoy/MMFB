@@ -33,7 +33,19 @@ def retrieve_task_ids(filenames):
     return np.unique(task_ids)
 
 
-def update_table_with_new_entry(main_data, new_entry, config, fidelity):
+def update_table_with_new_entry(
+        main_data: dict, new_entry: dict, config: dict, fidelity: dict
+) -> dict:
+    """ Updates the benchmark dict-hierarchy with a new function evaluation entry
+
+    The storage is in a nested dict structure where the keys are arranged in the order of the
+    configuration parameters ordered by their name, fidelity parameters ordered by their names
+    and the seed. The final value element in the dict contains another dict returned by the actual
+    function evaluations containing the result, cost, other misc. information.
+    Given that the depth of this dict data will vary for different parameter space, the package
+    `glom` is used. Wherein, the sequence of keys can be provided for easy retrieval, and
+    assignment of values even for varying depth of a hierarchical dict.
+    """
     seed = res['info']['seed']
     key_nest = []
     for k, v in config.items():
@@ -144,7 +156,10 @@ if __name__ == "__main__":
             except FileNotFoundError:
                 # if file was collected with os.listdir but deleted in the meanwhile, ignore it
                 continue
-            
+
+            # OrderedDict ensure consistency when building the hierarchy of dicts as lookup table
+            # since the hyperparameter and fidelity names don't change, ordering them ensures
+            # both storage and lookup can match
             config = OrderedDict(res['info']['config'])
             fidelity = OrderedDict(res['info']['fidelity'])
             res['info'].pop('config')
