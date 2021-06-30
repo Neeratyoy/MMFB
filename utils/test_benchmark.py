@@ -55,6 +55,12 @@ def input_arguments():
         type=int,
         help="number of random samples to draw"
     )
+    parser.add_argument(
+        "--path",
+        default=None,
+        type=str,
+        help="full path to benchmark file"
+    )
     args = parser.parse_args()
     return args
 
@@ -66,9 +72,6 @@ if __name__ == "__main__":
         if k == "task_id":
             continue
         args.__dict__[k] = v
-    base_path = os.path.join(args.output_path, args.space, str(args.fidelity_choice), "benchmark")
-    file_path = os.path.join(base_path, "task_{}.pkl".format(str(args.task_id)))
-    print(file_path)
 
     benchmark = param_space_dict[args.space](
         task_id=args.task_id, seed=args.seed, fidelity_choice=args.fidelity_choice
@@ -83,7 +86,10 @@ if __name__ == "__main__":
     print(config_space_discrete)
     print(fidelity_space_discrete)
 
-    with open(file_path, "rb") as f:
+    assert args.path is not None
+    if not os.path.isfile(args.path):
+        raise FileNotFoundError("Provided file path doesn't exist: {}".format(args.path))
+    with open(args.path, "rb") as f:
         table = pickle.load(f)
 
     for i in range(args.iters):
