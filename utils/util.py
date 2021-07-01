@@ -56,7 +56,7 @@ def get_parameter_grid(
         if isinstance(hp, CS.CategoricalHyperparameter):
             param_ranges.append(hp.choices)
         elif isinstance(hp, CS.OrdinalHyperparameter):
-            param_ranges.append(hp.sequences)
+            param_ranges.append(hp.sequence)
         elif isinstance(hp, CS.Constant):
             param_ranges.append([hp.value])
         else:
@@ -87,8 +87,8 @@ def get_discrete_configspace(
     """ Generates a new discretized ConfigurationSpace from a generally defined space
 
     Given the discretization grid size for each dimension, the new ConfigurationSpace contains
-    each hyperparmater as an OrdinalParameter with the discretized values for that dimension as the
-    sequence of choices available for that hyperparameter.
+    each hyperparmater as an OrdinalParameter with the discretized values for that dimension as
+    the sequence of choices available for that hyperparameter.
 
     Parameters
     ----------
