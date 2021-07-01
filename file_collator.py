@@ -65,7 +65,16 @@ def update_table_with_new_entry(
 
 def save_task_file(task_id, task_dict, path):
     obj = task_dict
-    with open(os.path.join(path, "task_{}.pkl".format(task_id)), 'wb') as f:
+    old_file = os.path.join(path, "task_{}_old.pkl".format(task_id))
+    new_file = os.path.join(path, "task_{}_new.pkl".format(task_id))
+    if os.path.isfile(new_file):
+        # renaming the existing new file as old
+        os.rename(new_file, old_file)
+    else:
+        # first iteration where a file is yet to be written
+        pass
+    # saving the new data as the new file
+    with open(new_file, 'wb') as f:
         pickle.dump(obj, f)
     return
 

@@ -9,4 +9,4 @@ n_workers: 4
 task_id: null
 scheduler_file: null
 seed: 1234
-exp_name: null
+exp_name: "toy"
