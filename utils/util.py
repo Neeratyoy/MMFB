@@ -61,15 +61,67 @@ def get_parameter_grid(
             param_ranges.append([hp.value])
         else:
             if hp.log:
-                param_ranges.append(
-                    np.exp(np.linspace(
-                        np.log(hp.lower), np.log(hp.upper), grid_step_size
-                    ).astype(np.float32))
-                )
+                grid = np.exp(np.linspace(
+                    np.log(hp.lower), np.log(hp.upper), grid_step_size
+                ))
+                grid = np.clip(grid, hp.lower, hp.upper).astype(np.float32)
             else:
-                param_ranges.append(
-                    np.linspace(hp.lower, hp.upper, grid_step_size).astype(np.float32)
-                )
+                grid = np.linspace(hp.lower, hp.upper, grid_step_size).astype(np.float32)
+            grid = grid.astype(int) if isinstance(hp, CS.UniformIntegerHyperparameter) else grid
+            param_ranges.append(grid)
+    full_grid = itertools.product(*param_ranges)
+    if not convert_to_configspace:
+        return list(full_grid)
+    config_list = []
+    for _config in full_grid:
+        config_list.append(map_to_config(cs, _config))
+    return config_list
+
+
+def get_fidelity_grid(
+        cs: CS.ConfigurationSpace,
+        grid_step_size: int = 10,
+        convert_to_configspace: bool = False,
+        include_sh_budgets: bool = True
+) -> Union[List[Tuple], List[CS.Configuration]]:
+    """Generates a grid from cartesian product of the fidelity spaced out at given step size
+
+    Parameters
+    ----------
+    cs : ConfigSpace.ConfigurationSpace
+    grid_step_size : int
+        The number of steps to divide a parameter dimension into
+    convert_to_configspace : bool
+        If True, returns a list of ConfigSpace objects of each point in the grid
+        If False, returns a list of tuples containing the values of each point in grid
+    include_sh_budgets : bool
+        If True, additionally includes budget spacing from Hyperband for eta={2,3,4}
+
+    Returns
+    -------
+    list
+    """
+    param_ranges = []
+    for hp in cs.get_hyperparameters():
+        if isinstance(hp, CS.Constant):
+            param_ranges.append([hp.value])
+        else:
+            if hp.log:
+                grid = np.exp(np.linspace(
+                    np.log(hp.lower), np.log(hp.upper), grid_step_size
+                ))
+                grid = np.clip(grid, hp.lower, hp.upper).astype(np.float32)
+            else:
+                grid = np.linspace(hp.lower, hp.upper, grid_step_size).astype(np.float32)
+            if include_sh_budgets:
+                hb_grid = np.array([])
+                for eta in [2, 3, 4]:
+                    hb_grid = np.concatenate(
+                        (hb_grid, generate_SH_fidelities(hp.lower, hp.upper, eta))
+                    ).astype(np.float32)
+                grid = np.unique(np.concatenate((hb_grid, grid)))
+            grid = grid.astype(int) if isinstance(hp, CS.UniformIntegerHyperparameter) else grid
+            param_ranges.append(np.unique(grid))
     full_grid = itertools.product(*param_ranges)
     if not convert_to_configspace:
         return list(full_grid)
@@ -112,6 +164,16 @@ def get_discrete_configspace(
             choices = choices.astype(np.float32)
         cs.add_hyperparameter(CS.OrdinalHyperparameter(str(k), choices))
     return cs
+
+
+def generate_SH_fidelities(
+        min_budget: Union[int, float], max_budget: Union[int, float], eta: int = 3
+) -> np.ndarray:
+    """ Creates a geometric progression of budgets/fidelities based on Successive Halving
+    """
+    max_SH_iter = -int(np.log(min_budget / max_budget) / np.log(eta)) + 1
+    budgets = max_budget * np.power(eta, -np.linspace(start=max_SH_iter-1, stop=0, num=max_SH_iter))
+    return budgets
 
 
 def load_yaml_args(filename):

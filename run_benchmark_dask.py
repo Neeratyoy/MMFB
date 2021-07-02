@@ -14,11 +14,12 @@ from typing import Dict, Tuple
 from distributed import Client
 from pympler.asizeof import asizeof
 
+sys.path.append("/media/neeratyoy/Mars/Freiburg/Thesis/code/HPOBench/")
 from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 
-from utils.util import get_parameter_grid, map_to_config, DaskHelper, load_yaml_args, dump_yaml_args
+from utils.util import *
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -130,6 +131,12 @@ def input_arguments():
         help="The size of grid steps to split each dimension of the fidelity space.\nFor a "
              "parameter with range [0, 20] and step size of 10, the resultant grid would be "
              "[0, 2.22, 4.44, ..., 17.78, 20], using numpy.linspace."
+    )
+    parser.add_argument(
+        "--include_SH",
+        default=False,
+        action="store_true",
+        help="Includes geometric budget spacing from Successive Halving"
     )
     parser.add_argument(
         "--fidelity_choice",
@@ -282,7 +289,9 @@ if __name__ == "__main__":
     # Retrieving fidelity spaces and populating grid
     z_cs = benchmark.z_cs
     logger.info("Populating grid for fidelity space...")
-    grid_fidelity = get_parameter_grid(z_cs, args.z_grid_size, convert_to_configspace=False)
+    grid_fidelity = get_fidelity_grid(
+        z_cs, args.z_grid_size, convert_to_configspace=False, include_sh_budgets=args.include_SH
+    )
     logger.info("{} unique fidelity configurations generated".format(len(grid_fidelity)))
     logger.debug("Fidelity space grid size: {:.2f} MB".format(asizeof(grid_fidelity) / 1024 ** 2))
 
