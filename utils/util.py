@@ -31,6 +31,16 @@ def map_to_config(cs: CS.ConfigurationSpace, vector: Union[np.array, List]) -> C
     return config
 
 
+def generate_SH_fidelities(
+        min_budget: Union[int, float], max_budget: Union[int, float], eta: int = 3
+) -> np.ndarray:
+    """ Creates a geometric progression of budgets/fidelities based on Successive Halving
+    """
+    max_SH_iter = -int(np.log(min_budget / max_budget) / np.log(eta)) + 1
+    budgets = max_budget * np.power(eta, -np.linspace(start=max_SH_iter-1, stop=0, num=max_SH_iter))
+    return budgets
+
+
 def get_parameter_grid(
         cs: CS.ConfigurationSpace,
         grid_step_size: int = 10,
@@ -134,7 +144,8 @@ def get_fidelity_grid(
 def get_discrete_configspace(
         configspace: CS.ConfigurationSpace,
         grid_size: int=10,
-        seed: Union[int, None]=None
+        seed: Union[int, None] = None,
+        fidelity_space: bool = False
 ):
     """ Generates a new discretized ConfigurationSpace from a generally defined space
 
@@ -153,7 +164,10 @@ def get_discrete_configspace(
     -------
     ConfigSpace.ConfigurationSpace
     """
-    grid_list = pd.DataFrame(get_parameter_grid(configspace, grid_size))
+    if fidelity_space:
+        grid_list = pd.DataFrame(get_fidelity_grid(configspace, grid_size))
+    else:
+        grid_list = pd.DataFrame(get_parameter_grid(configspace, grid_size))
     cs = CS.ConfigurationSpace(seed=seed)
     hp_names = np.sort(configspace.get_hyperparameter_names()).tolist()
     for i, k in enumerate(hp_names):
@@ -164,16 +178,6 @@ def get_discrete_configspace(
             choices = choices.astype(np.float32)
         cs.add_hyperparameter(CS.OrdinalHyperparameter(str(k), choices))
     return cs
-
-
-def generate_SH_fidelities(
-        min_budget: Union[int, float], max_budget: Union[int, float], eta: int = 3
-) -> np.ndarray:
-    """ Creates a geometric progression of budgets/fidelities based on Successive Halving
-    """
-    max_SH_iter = -int(np.log(min_budget / max_budget) / np.log(eta)) + 1
-    budgets = max_budget * np.power(eta, -np.linspace(start=max_SH_iter-1, stop=0, num=max_SH_iter))
-    return budgets
 
 
 def load_yaml_args(filename):

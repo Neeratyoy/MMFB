@@ -91,7 +91,7 @@ if __name__ == "__main__":
         raise FileNotFoundError("Provided file path doesn't exist: {}".format(args.path))
     with open(args.path, "rb") as f:
         table = pickle.load(f)
-
+    table = table['data']
     for i in range(args.iters):
         config = config_space_discrete.sample_configuration()
         fidelity = fidelity_space_discrete.sample_configuration()

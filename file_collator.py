@@ -11,7 +11,7 @@ from loguru import logger
 from collections import OrderedDict
 from joblib.parallel import Parallel, parallel_backend, delayed
 
-from utils.util import map_to_config
+from utils.util import *
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -63,8 +63,10 @@ def update_table_with_new_entry(
     return main_data
 
 
-def save_task_file(task_id, task_dict, path):
+def save_task_file(task_id, task_dict, path, config_spaces, exp_args):
     obj = task_dict
+    task_dict['config_spaces'] = config_spaces
+    task_dict['exp_args'] = exp_args.__dict__
     old_file = os.path.join(path, "task_{}_old.pkl".format(task_id))
     new_file = os.path.join(path, "task_{}_new.pkl".format(task_id))
     if os.path.isfile(new_file):
@@ -87,6 +89,8 @@ if __name__ == "__main__":
                         help="Directory for files for a fidelity choice")
     parser.add_argument("--max_batch_size", type=int, default=100000,
                         help="The number of files to process per loop iteration")
+    parser.add_argument("--config", type=str, default=None,
+                        help="Full path to experiment config for which collator is running")
     parser.add_argument("--n_jobs", type=int, default=1,
                         help="The number of parallel cores for speeding up file writes per task")
     args = parser.parse_args()
@@ -108,6 +112,12 @@ if __name__ == "__main__":
         x_cs = pickle.load(f)
     with open(os.path.join(path, "param_space.pkl"), "rb") as f:
         z_cs = pickle.load(f)
+    exp_args = load_yaml_args(args.config)
+    x_cs_discrete = get_discrete_configspace(x_cs, exp_args.x_grid_size)
+    z_cs_discrete = get_discrete_configspace(z_cs, exp_args.z_grid_size)
+    config_spaces = dict(
+        x=x_cs, x_discrete=x_cs_discrete, z=z_cs, z_discrete=z_cs_discrete
+    )
 
     # Logging details
     log_suffix = time.strftime("%x %X %Z")
@@ -147,7 +157,7 @@ if __name__ == "__main__":
 
         for tid in _task_ids:
             if tid not in task_datas.keys():
-                task_datas[tid] = dict()
+                task_datas[tid] = dict(progress=0, data=dict())
 
         start = time.time()
         logger.info("\tStarting collection...")
@@ -174,8 +184,10 @@ if __name__ == "__main__":
             res['info'].pop('config')
             res['info'].pop('fidelity')
             task_id = int(filename.split('/')[0].split('_')[0])
-            task_datas[task_id] = update_table_with_new_entry(
-                task_datas[task_id], res, config, fidelity
+            progress_id = int(filename.split('.pkl')[0].split('_')[-1])
+            task_datas[task_id]['progress'] = max(task_datas[task_id]['progress'], progress_id)
+            task_datas[task_id]['data'] = update_table_with_new_entry(
+                task_datas[task_id]['data'], res, config, fidelity
             )
             file_count += 1
 
@@ -190,7 +202,9 @@ if __name__ == "__main__":
 
         with parallel_backend(backend="loky", n_jobs=args.n_jobs):
             Parallel()(
-                delayed(save_task_file)(task_id, obj, output_path) for task_id, obj in task_datas.items()
+                delayed(save_task_file)(
+                    task_id, obj, output_path, config_spaces, exp_args
+                ) for task_id, obj in task_datas.items()
             )
         logger.info("\tContinuing to next batch")
         logger.info("\t{}".format("-" * 25))

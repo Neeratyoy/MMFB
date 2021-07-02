@@ -43,13 +43,14 @@ def config2hash(config):
 
 
 def return_dict(combination: Tuple) -> Dict:
-    assert len(combination) == 5
+    assert len(combination) == 6
     evaluation = dict()
     evaluation["task_id"] = combination[0]
     evaluation["config"] = combination[1]
     evaluation["fidelity"] = combination[2]
     evaluation["seed"] = combination[3]
     evaluation["path"] = combination[4]
+    evaluation["id"] = combination[5]
     return evaluation
 
 
@@ -75,6 +76,7 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     fidelity_hash = config2hash(fidelity)
     seed = evaluation["seed"]
     path = evaluation["path"]
+    i = evaluation["id"]
     task_path = os.path.join(path, str(task_id))
     os.makedirs(task_path, exist_ok=True)
 
@@ -83,7 +85,7 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     result = benchmark.objective(config, fidelity)
     result['info']['seed'] = seed
     # file_collator should collect the pickle files dumped below
-    name = "{}/{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed)
+    name = "{}/{}_{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed, i)
     with open(name, 'wb') as f:
         pickle.dump(result, f)
     return "success"
@@ -184,6 +186,12 @@ def input_arguments():
         type=str,
         help="Creates an experiment directory and if script executed with cmd arguments, "
              "dumps an yaml file with the arguments at the same level"
+    )
+    parser.add_argument(
+        "--restart_id",
+        default=0,
+        type=int,
+        help="Runs and computes the experiment from `restart_id` onwards"
     )
     args = parser.parse_args()
     return args
@@ -324,9 +332,13 @@ if __name__ == "__main__":
     ):
         logger.info("{}/{}".format(i, total_combinations))
         logger.debug("Running for {:.2f} seconds".format(time.time() - start))
+        if i < args.restart_id:
+            logger.debug("Skipping and continuing evaluation..")
+            continue
         combination = list(combination)
         combination[1] = map_to_config(x_cs, combination[1])
         combination[2] = map_to_config(z_cs, combination[2])
+        combination.append(i)
         if num_workers == 1:
             compute(return_dict(combination), benchmarks)
             continue
