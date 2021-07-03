@@ -1,3 +1,4 @@
+import os
 import time
 import yaml
 import itertools
@@ -6,6 +7,12 @@ import pandas as pd
 import ConfigSpace as CS
 from distributed import Client
 from typing import Union, List, Tuple
+
+all_task_ids = [
+    3, 12, 31, 53, 3917, 3945, 7592, 7593, 9952, 9977, 9981, 10101, 14965, 34539, 146195, 146212,
+    146606, 146818, 146821, 146822, 146825, 167119, 167120, 168329, 168330, 168331, 168332, 168335,
+    168337, 168338, 168868, 168908, 168909, 168910, 168911, 168912, 189354, 189355, 189356
+]
 
 
 def map_to_config(cs: CS.ConfigurationSpace, vector: Union[np.array, List]) -> CS.Configuration:
@@ -190,6 +197,17 @@ def load_yaml_args(filename):
 def dump_yaml_args(args, filename):
     with open(filename, "w") as f:
         f.writelines(yaml.dump(args))
+    return
+
+
+def arg_yaml_all_task(space, dest="nemo", exp_type="toy"):
+    args = load_yaml_args(os.path.join("arguments", dest, exp_type, "{}_args.yaml".format(space)))
+    args.n_tasks = None
+    args.exp_name = exp_type
+    for task_id in all_task_ids:
+        args.task_id = task_id
+        filename = os.path.join("arguments", dest, exp_type, space, "args_{}.yaml".format(task_id))
+        dump_yaml_args(dict(args), filename)
     return
 
 
