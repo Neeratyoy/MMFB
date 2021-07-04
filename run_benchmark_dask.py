@@ -20,6 +20,7 @@ from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 
 from utils.util import *
+from utils.util import all_task_ids_by_in_mem_size
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -214,8 +215,9 @@ if __name__ == "__main__":
     param_space = param_space_dict[args.space]
 
     # Task input check
-    automl_benchmark = openml.study.get_suite(218)
-    task_ids = automl_benchmark.tasks
+    # automl_benchmark = openml.study.get_suite(218)
+    # task_ids = automl_benchmark.tasks
+    task_ids = all_task_ids_by_in_mem_size
     if args.n_tasks is None and args.task_id is None:
         warnings.warn("Both task_id or number of tasks were not specified. "
                       "Will run all {} tasks!".format(len(task_ids)))
@@ -347,6 +349,7 @@ if __name__ == "__main__":
         # next combination to be submitted if client.is_worker_available() is True
         while True:
             if client.is_worker_available():
+                client.distribute_data_to_workers(benchmarks)
                 # benchmarks should be provided as a second argument to compute() by dask as
                 # the benchmarks are already distributed across the workers
                 client.submit_job(compute, return_dict(combination))

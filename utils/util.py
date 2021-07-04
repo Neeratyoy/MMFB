@@ -1,18 +1,92 @@
 import os
 import time
 import yaml
+import openml
 import itertools
 import numpy as np
 import pandas as pd
 import ConfigSpace as CS
 from distributed import Client
+from pympler.asizeof import asizeof
 from typing import Union, List, Tuple
+
 
 all_task_ids = [
     3, 12, 31, 53, 3917, 3945, 7592, 7593, 9952, 9977, 9981, 10101, 14965, 34539, 146195, 146212,
-    146606, 146818, 146821, 146822, 146825, 167119, 167120, 168329, 168330, 168331, 168332, 168335,
-    168337, 168338, 168868, 168908, 168909, 168910, 168911, 168912, 189354, 189355, 189356
+    146606, 146818, 146821, 146822, 146825, 167119, 167120, 168329, 168330, 168331,
+    168332,  # took long
+    168335, 168337, 168338, 168868, 168908, 168909, 168910, 168911, 168912, 189354, 189355, 189356
 ]
+
+all_task_ids_by_disk_size = [
+    146821, 10101, 146818, 31, 53, 3, 9952, 146822, 3917, 168912, 168911, 34539, 167119, 7592,
+    14965, 12, 146195, 146212, 9981,  # < 40 MB
+    168329, 167120, 189354, 146606, 9977,  # 40-100 MB
+    168330, 168335, 168910, 168908, 7593, 168331, 3945, 168868, 168909,  # 100-500 MB
+    189355, 189356,  # >500 MB
+    146825, 168332, 168337, 168338  # >1000 MB
+]
+
+all_task_ids_by_in_mem_size = [
+    10101, 53, 146818, 146821, 9952, 146822, 31, 3917, 168912, 3, 167119, 12, 146212, 168911,
+    9981, 168329, 167120, 14965, 146606,  # < 30 MB
+    168330, 7592, 9977, 168910, 168335, 146195, 168908, 168331,  # 30-100 MB
+    168868, 168909, 189355, 146825, 7593,  # 100-500 MB
+    168332, 168337, 168338,  # > 500 MB
+    189354, 34539,  # > 2.5k MB
+    3945,  # >20k MB
+    189356  # MemoryError: Unable to allocate 1.50 TiB; array size (256419, 802853) of type float64
+]
+
+
+def obj_size(obj):
+    """ Returns size in MB
+    """
+    return asizeof(obj) / 1024 ** 2
+
+
+def profile_tasks(n=40):
+    """ Reads all_task_ids to generate task meta data and sort task IDs by dataset size on disk
+    """
+    selected_qualities = [
+        "NumberOfInstances", "NumberOfFeatures", "NumberOfClasses", "PercentageOfNumericFeatures",
+        "PercentageOfSymbolicFeatures", "Size(in MB)"
+    ]
+    meta_d = dict()
+    for task_id in all_task_ids[:n]:
+        print(task_id)
+        task = openml.tasks.get_task(task_id, download_data=False)
+        # fetches dataset
+        dataset = openml.datasets.get_dataset(task.dataset_id, download_data=False)
+        X, y, categorical_ind, feature_names = dataset.get_data(
+            target=task.target_name, dataset_format="dataframe"
+        )
+        size = (asizeof(X) + asizeof(y)) / (1024 ** 2)
+        qualities = {k: v for k, v in dataset.qualities.items() if k in selected_qualities}
+        qualities[selected_qualities[-1]] = size
+        meta_d[task_id] = qualities
+    profile = pd.DataFrame.from_dict(meta_d, orient="index").sort_values(by="Size(in MB)")
+    return profile
+
+
+def profile_benchmarks(n=40, model=None):
+    """ Reads all_task_ids_by_disk_size to sort task IDs by dataset size in memory post-transform
+    """
+    skip_tasks = [189356]
+    if model is None:
+        raise ValueError("Pass a benchmark class name (example: SVMBenchmark) under `model`!")
+    meta_d = dict()
+    for task_id in all_task_ids_by_disk_size[:n]:
+        if task_id in skip_tasks:
+            continue
+        print(task_id)
+        benchmark = model(task_id=task_id)
+        meta_d[task_id] = obj_size(benchmark.train_X) + obj_size(benchmark.train_y) + \
+                          obj_size(benchmark.valid_X) + obj_size(benchmark.valid_y) + \
+                          obj_size(benchmark.test_X) + obj_size(benchmark.test_y)
+    profile = pd.DataFrame.from_dict(meta_d, orient="index", columns=["Size(in MB)"])
+    profile = profile.sort_values(by="Size(in MB)")
+    return profile
 
 
 def map_to_config(cs: CS.ConfigurationSpace, vector: Union[np.array, List]) -> CS.Configuration:
@@ -227,7 +301,7 @@ class DaskHelper:
     def __init__(self, n_workers=1, client=None):
         if client is not None and isinstance(client, Client):
             self.client = client
-            self.n_workers = len(self.client.ncores())
+            self.n_workers = self._get_n_workers()
         else:
             self.n_workers = n_workers
             self.client = Client(
@@ -238,6 +312,15 @@ class DaskHelper:
             )
         self.futures = []
         self.shared_data = None
+        self.worker_list = None
+
+    def _get_n_workers(self):
+        self.n_workers = len(self.client.ncores())
+        return self.n_workers
+
+    def _get_worker_list(self):
+        worker_list = list(self.client.ncores().keys())
+        return worker_list
 
     def __getstate__(self):
         """ Allows the object to picklable while having Dask client as a class attribute.
@@ -264,7 +347,7 @@ class DaskHelper:
         if self.n_workers == 1:
             # in the synchronous case, one worker is always available
             return True
-        workers = len(self.client.ncores())
+        workers = self._get_n_workers()
         if len(self.futures) >= workers:
             # pause/wait if active worker count greater allocated workers
             return False
@@ -292,7 +375,14 @@ class DaskHelper:
     def distribute_data_to_workers(self, data):
         """ Shares data across all workers to not serialize and transfer with every job
         """
-        self.shared_data = self.client.scatter(data, broadcast=True)
+        if self.worker_list is None:
+            self.worker_list = self._get_worker_list()
+            self.shared_data = self.client.scatter(data, broadcast=True)
+        current_worker_list = list(self.client.ncores().keys())
+        if len(set(current_worker_list) - set(self.worker_list)) > 0:
+            # redistribute data across workers only when new workers have been added
+            self.shared_data = self.client.scatter(data, broadcast=True)
+        self.worker_list = self._get_worker_list()
 
     def is_worker_alive(self):
         return len(self.futures) > 0

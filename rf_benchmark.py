@@ -219,7 +219,7 @@ class RandomForestBenchmark:
         self.lower_bound_train_size = (10 * n_classes) / self.train_X.shape[0]
 
         if verbose:
-            print("Shape of data post-preprocessing: {}".format(train_X.shape), "\n")
+            print("Shape of data post-preprocessing: {}".format(self.train_X.shape), "\n")
 
         if verbose:
             print("\nTraining data (X, y): ({}, {})".format(self.train_X.shape, self.train_y.shape))
@@ -228,7 +228,7 @@ class RandomForestBenchmark:
             print("\nData loading complete!\n")
         return
 
-    def shuffle_data_idx(self, train_id=None, ng=None):
+    def shuffle_data_idx(self, train_idx=None, ng=None):
         rng = self.rng if rng is None else rng
         train_idx = self.train_idx if train_idx is None else train_idx
         rng.shuffle(train_idx)
