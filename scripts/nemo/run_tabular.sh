@@ -2,6 +2,7 @@
 
 model=$1
 runtype=$2
+taskid=$3
 
 codedir=$HOME'/Thesis/code/MMFB'
 wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
@@ -17,7 +18,7 @@ if [ -z "$runtype" ]
   then
     runtype="toy"
 fi
-config=$codedir"/arguments/nemo/"$runtype/$model"_args.yaml"
+config=$codedir"/arguments/nemo/"$runtype/$model"/args_"$3".yaml"
 
 echo "Collecting "$runtype" benchmark for "$model" space"
 echo "Loading args from "$config

@@ -9,7 +9,13 @@
 codedir=$HOME'/Thesis/code/MMFB'
 wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
+space=$1
+exp=$2
+taskid=$3
+
+echo $
+
 export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
-bash $codedir/scripts/nemo/run_tabular.sh rf toy
+bash $codedir/scripts/nemo/run_tabular.sh $1 $2 $3
