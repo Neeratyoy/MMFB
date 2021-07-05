@@ -35,7 +35,7 @@ all_task_ids_by_in_mem_size = [
     168332, 168337, 168338,  # > 500 MB
     189354, 34539,  # > 2.5k MB
     3945,  # >20k MB
-    189356  # MemoryError: Unable to allocate 1.50 TiB; array size (256419, 802853) of type float64
+    # 189356  # MemoryError: Unable to allocate 1.50 TiB; array size (256419, 802853) of type float64
 ]
 
 

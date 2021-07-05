@@ -1,0 +1,13 @@
+exp_name: full
+fidelity_choice: 1
+n_seeds: 5
+n_tasks: null
+n_workers: null
+output_path: /work/ws/nemo/fr_nm217-hpobench-0/
+restart_id: 0
+scheduler_file: /home/fr/fr_fr/fr_nm217/Thesis/code/MMFB/tmp_dump/scheduler.json
+seed: 1234
+space: rf
+task_id: 168332
+x_grid_size: 10
+z_grid_size: 10
