@@ -14,10 +14,10 @@ from typing import Dict, Tuple
 from distributed import Client
 from pympler.asizeof import asizeof
 
-sys.path.append("/media/neeratyoy/Mars/Freiburg/Thesis/code/HPOBench/")
-from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
+from hpobench.benchmarks.ml.svm_benchmark import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
+from hpobench.benchmarks.ml.xgboost_benchmark import XGBoostBenchmark
 
 from utils.util import *
 from utils.util import all_task_ids_by_in_mem_size
@@ -33,7 +33,8 @@ _logger_props = {
 param_space_dict = dict(
     rf=RandomForestBenchmark,
     svm=SVMBenchmark,
-    histgb=HistGBBenchmark
+    histgb=HistGBBenchmark,
+    xgboost=XGBoostBenchmark,
 )
 
 
@@ -83,7 +84,7 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
 
     benchmark = benchmarks[task_id][seed]
     # the lookup dict key for each evaluation is a 4-element tuple
-    result = benchmark.objective(config, fidelity)
+    result = benchmark.objective_function(config, fidelity)
     result['info']['seed'] = seed
     # file_collator should collect the pickle files dumped below
     name = "{}/{}_{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed, i)
@@ -104,7 +105,7 @@ def input_arguments():
         "--space",
         default="rf",
         type=str,
-        choices=["rf", "svm", "histgb"],
+        choices=list(param_space_dict.keys()),
         help="The number of tasks to run data collection on from the AutoML benchmark suite"
     )
     parser.add_argument(

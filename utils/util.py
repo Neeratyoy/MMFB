@@ -102,11 +102,14 @@ def map_to_config(cs: CS.ConfigurationSpace, vector: Union[np.array, List]) -> C
     ConfigSpace.Configuration
     """
     config = cs.sample_configuration()
-    for i, hp in enumerate(cs.get_hyperparameters()):
+    for i, name in enumerate(np.sort(cs.get_hyperparameter_names())):
+        hp = cs.get_hyperparameter(str(name))
         if isinstance(hp, CS.UniformIntegerHyperparameter):
             config[hp.name] = int(vector[i])
         elif isinstance(hp, CS.UniformFloatHyperparameter):
-            config[hp.name] = float(vector[i])
+            # clip introduced to handle the edge case when a 64-bit float type casting introduces
+            # extra precision which can make the number lower than the hard hp.lower limit
+            config[hp.name] = np.clip(float(vector[i]), hp.lower, hp.upper)
         else:
             config[hp.name] = vector[i]
     return config
@@ -143,7 +146,8 @@ def get_parameter_grid(
     list
     """
     param_ranges = []
-    for hp in cs.get_hyperparameters():
+    for name in np.sort(cs.get_hyperparameter_names()):
+        hp = cs.get_hyperparameter(str(name))
         if isinstance(hp, CS.CategoricalHyperparameter):
             param_ranges.append(hp.choices)
         elif isinstance(hp, CS.OrdinalHyperparameter):
@@ -193,7 +197,8 @@ def get_fidelity_grid(
     list
     """
     param_ranges = []
-    for hp in cs.get_hyperparameters():
+    for name in np.sort(cs.get_hyperparameter_names()):
+        hp = cs.get_hyperparameter(str(name))
         if isinstance(hp, CS.Constant):
             param_ranges.append([hp.value])
         else:
