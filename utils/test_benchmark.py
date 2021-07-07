@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 from collections import OrderedDict
 
-from hpobench.benchmarks.ml.svm_benchmark_2 import SVMBenchmark
+from hpobench.benchmarks.ml.svm_benchmark import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 

@@ -9,3 +9,5 @@ pympler>=0.9
 glom>=20.11.0
 pyyaml>=5.3.1
 xgboost==0.90
+arrow>=1.1.1
+pyarrow>=4.0.1

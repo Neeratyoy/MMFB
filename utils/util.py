@@ -89,6 +89,36 @@ def profile_benchmarks(n=40, model=None):
     return profile
 
 
+def generate_openml_splits(benchmark_obj, task_id, path, valid_size=0.33, seed=1):
+    path = os.path.join(path, str(task_id))
+    os.makedirs(path, exist_ok=True)
+    benchmark = benchmark_obj(task_id=task_id, valid_size=valid_size, seed=seed)
+    path_str = os.path.join(path, "{}_{}.parquet.gzip")
+    colnames = np.arange(benchmark.train_X.shape[1]).astype(str)
+    label_name = str(benchmark.task.target_name)
+    pd.DataFrame(benchmark.train_X, columns=colnames).to_parquet(path_str.format("train", "x"))
+    benchmark.train_y.to_frame(label_name).to_parquet(path_str.format("train", "y"))
+    pd.DataFrame(benchmark.valid_X, columns=colnames).to_parquet(path_str.format("valid", "x"))
+    benchmark.valid_y.to_frame(label_name).to_parquet(path_str.format("valid", "y"))
+    pd.DataFrame(benchmark.test_X, columns=colnames).to_parquet(path_str.format("test", "x"))
+    benchmark.test_y.to_frame(label_name).to_parquet(path_str.format("test", "y"))
+    return benchmark
+
+
+def read_openml_splits(task_id, path):
+    path = os.path.join(path, str(task_id))
+    if not os.path.isdir(path):
+        raise ValueError("Path doesn't exist!")
+    path_str = os.path.join(path, "{}_{}.parquet.gzip")
+    train_X = pd.read_parquet(path_str.format("train", "x")).to_numpy()
+    train_y = pd.read_parquet(path_str.format("train", "y")).squeeze(axis=1)
+    valid_X = pd.read_parquet(path_str.format("valid", "x")).to_numpy()
+    valid_y = pd.read_parquet(path_str.format("valid", "y")).squeeze(axis=1)
+    test_X = pd.read_parquet(path_str.format("test", "x")).to_numpy()
+    test_y = pd.read_parquet(path_str.format("test", "y")).squeeze(axis=1)
+    return train_X, train_y, valid_X, valid_y, test_X, test_y
+
+
 def map_to_config(cs: CS.ConfigurationSpace, vector: Union[np.array, List]) -> CS.Configuration:
     """Return a ConfigSpace object with values assigned from the vector
 
