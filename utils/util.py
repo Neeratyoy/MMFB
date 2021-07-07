@@ -197,6 +197,7 @@ def get_fidelity_grid(
     list
     """
     param_ranges = []
+    selected_etas = [3]
     for name in np.sort(cs.get_hyperparameter_names()):
         hp = cs.get_hyperparameter(str(name))
         if isinstance(hp, CS.Constant):
@@ -211,7 +212,7 @@ def get_fidelity_grid(
                 grid = np.linspace(hp.lower, hp.upper, grid_step_size).astype(np.float32)
             if include_sh_budgets:
                 hb_grid = np.array([])
-                for eta in [2, 3, 4]:
+                for eta in selected_etas:
                     hb_grid = np.concatenate(
                         (hb_grid, generate_SH_fidelities(hp.lower, hp.upper, eta))
                     ).astype(np.float32)
