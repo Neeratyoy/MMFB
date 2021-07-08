@@ -305,7 +305,7 @@ if __name__ == "__main__":
             )
             benchmarks[task_id][seed].load_data_from_openml()
     logger.info("Total size of {} benchmark objects in memory: {:.5f} MB".format(
-        len(benchmarks), obj_size(benchmarks)
+        len(task_ids) * len(seeds), obj_size(benchmarks)
     ))
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = benchmarks[task_ids[0]][seeds[0]]
