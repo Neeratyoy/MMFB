@@ -2,20 +2,20 @@
 
 #MSUB -l nodes=1:ppn=4
 #MSUB -l walltime=96:00:00
-#MSUB -N rf-toy
+#MSUB -N svm-full-10101
 #MSUB -o /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
 #MSUB -e /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
 
 codedir=$HOME'/Thesis/code/MMFB'
 wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
 
-space=$1
-exp=$2
-taskid=$3
+space='svm'
+exp='full'
+taskid=10101
 
-echo $
+echo "Running "$exp" experiment on "$space" for task ID "$taskid
 
 export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
-bash $codedir/scripts/nemo/run_tabular.sh $1 $2 $3
+bash $codedir/scripts/nemo/run_tabular.sh $space $exp $taskid
