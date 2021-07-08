@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     with open(os.path.join(base_path, "param_space.pkl"), "rb") as f:
         x_cs = pickle.load(f)
-    with open(os.path.join(path, "param_space.pkl"), "rb") as f:
+    with open(os.path.join(path, "fidelity_space.pkl"), "rb") as f:
         z_cs = pickle.load(f)
     exp_args = load_yaml_args(args.config)
     x_cs_discrete = get_discrete_configspace(x_cs, exp_args.x_grid_size)

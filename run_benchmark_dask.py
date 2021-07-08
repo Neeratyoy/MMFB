@@ -10,6 +10,7 @@ import argparse
 import itertools
 import numpy as np
 from loguru import logger
+from copy import deepcopy
 from typing import Dict, Tuple
 from distributed import Client
 from pympler.asizeof import asizeof
@@ -20,7 +21,7 @@ from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 from hpobench.benchmarks.ml.xgboost_benchmark import XGBoostBenchmark
 
 from utils.util import *
-from utils.util import all_task_ids_by_in_mem_size
+from utils.util import all_task_ids_by_in_mem_size, read_openml_splits
 
 
 logger.configure(handlers=[{"sink": sys.stdout, "level": "INFO"}])
@@ -83,6 +84,20 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     os.makedirs(task_path, exist_ok=True)
 
     benchmark = benchmarks[task_id][seed]
+    if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
+        # creating a copy of the benchmark object prevents the collection of benchmarks shared
+        # among workers to not bloat in memory and the data loads happen independently for each
+        # worker process, thus allowing the individual worker memory to stay within its limit
+        benchmark = deepcopy(benchmark)
+        # load splits from specified path
+        benchmark.train_X, \
+        benchmark.train_y, \
+        benchmark.valid_X, \
+        benchmark.valid_y, \
+        benchmark.test_X, \
+        benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
+    print(type(benchmark), obj_size(benchmark), obj_size(benchmark.train_X))
+
     # the lookup dict key for each evaluation is a 4-element tuple
     result = benchmark.objective_function(config, fidelity)
     result['info']['seed'] = seed
@@ -107,6 +122,12 @@ def input_arguments():
         type=str,
         choices=list(param_space_dict.keys()),
         help="The number of tasks to run data collection on from the AutoML benchmark suite"
+    )
+    parser.add_argument(
+        "--data_path",
+        default="./tmp_dump/openml_splits/",
+        type=str,
+        help="The directory to load data splits from"
     )
     parser.add_argument(
         "--n_tasks",
@@ -265,7 +286,6 @@ if __name__ == "__main__":
 
     # Load tasks
     logger.info("Loaded AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
-    np.random.shuffle(task_ids)
 
     # Selecting seeds
     seeds = np.random.randint(1, 10000, size=args.n_seeds)
@@ -278,24 +298,30 @@ if __name__ == "__main__":
         for seed in seeds:
             logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
             benchmarks[task_id][seed] = param_space(
-                task_id=task_id, seed=seed, fidelity_choice=args.fidelity_choice
+                task_id=task_id,
+                seed=seed,
+                fidelity_choice=args.fidelity_choice,
+                data_path=args.data_path
             )
             benchmarks[task_id][seed].load_data_from_openml()
+    logger.info("Total size of {} benchmark objects in memory: {:.5f} MB".format(
+        len(benchmarks), obj_size(benchmarks)
+    ))
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = benchmarks[task_ids[0]][seeds[0]]
 
     # Saving a copy of the ConfigSpaces used for this run
     with open(os.path.join(base_path, "param_space.pkl"), "wb") as f:
-        pickle.dump(benchmark.x_cs, f)
-    with open(os.path.join(path, "param_space.pkl"), "wb") as f:
-        pickle.dump(benchmark.z_cs, f)
+        pickle.dump(benchmark.x_cs, f)  # hyper-parameter configuration space
+    with open(os.path.join(path, "fidelity_space.pkl"), "wb") as f:
+        pickle.dump(benchmark.z_cs, f)  # fidelity configuration space
 
     # Retrieving observation space and populating grid
     x_cs = benchmark.x_cs
     logger.info("Populating grid for observation space...")
     grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=False)
     logger.info("{} unique observations generated".format(len(grid_config)))
-    logger.debug("Observation space grid size: {:.2f} MB".format(asizeof(grid_config) / 1024 ** 2))
+    logger.debug("Observation space grid size: {:.2f} MB".format(obj_size(grid_config)))
 
     # Retrieving fidelity spaces and populating grid
     z_cs = benchmark.z_cs
@@ -304,7 +330,7 @@ if __name__ == "__main__":
         z_cs, args.z_grid_size, convert_to_configspace=False, include_sh_budgets=args.include_SH
     )
     logger.info("{} unique fidelity configurations generated".format(len(grid_fidelity)))
-    logger.debug("Fidelity space grid size: {:.2f} MB".format(asizeof(grid_fidelity) / 1024 ** 2))
+    logger.debug("Fidelity space grid size: {:.2f} MB".format(obj_size(grid_fidelity)))
 
     # Dask initialisation
     if args.scheduler_file is not None and os.path.isfile(args.scheduler_file):

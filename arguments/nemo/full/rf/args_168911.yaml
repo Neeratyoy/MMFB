@@ -1,3 +1,4 @@
+data_path: /work/ws/nemo/fr_nm217-hpobench-0/openml_splits
 exp_name: full
 fidelity_choice: 1
 include_SH: true
