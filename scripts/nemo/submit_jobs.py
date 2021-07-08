@@ -29,7 +29,7 @@ def input_args():
     parser.add_argument("--tasks", default=None, nargs="+", type=int)
     parser.add_argument("--space", default=None, type=str)
     parser.add_argument("--exp_type", default="full", type=str, choices=["full", "toy"])
-    parser.add_argument("--codedir", default="$HOME/Thesis/code/MMFB", type=str)
+    parser.add_argument("--codedir", default="/home/fr/fr_fr/fr_nm217/Thesis/code/MMFB", type=str)
     args = parser.parse_args()
     return args
 
