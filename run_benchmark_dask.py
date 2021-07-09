@@ -46,18 +46,21 @@ def config2hash(config):
 
 
 def return_dict(combination: Tuple) -> Dict:
-    assert len(combination) == 6
+    assert len(combination) == 9
     evaluation = dict()
     evaluation["task_id"] = combination[0]
     evaluation["config"] = combination[1]
     evaluation["fidelity"] = combination[2]
     evaluation["seed"] = combination[3]
     evaluation["path"] = combination[4]
-    evaluation["id"] = combination[5]
+    evaluation["data_path"] = combination[5]
+    evaluation["fidelity_choice"] = combination[6]
+    evaluation["id"] = combination[7]
+    evaluation["space"] = combination[8]
     return evaluation
 
 
-def compute(evaluation: dict, benchmarks: dict=None) -> str:
+def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     """ Function to evaluate a configuration-fidelity on a task for a seed
 
     Parameters
@@ -79,11 +82,20 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
     fidelity_hash = config2hash(fidelity)
     seed = evaluation["seed"]
     path = evaluation["path"]
+    data_path = evaluation["data_path"]
+    fidelity_choice = evaluation["fidelity_choice"]
     i = evaluation["id"]
+    model_space = evaluation["space"]
     task_path = os.path.join(path, str(task_id))
     os.makedirs(task_path, exist_ok=True)
 
-    benchmark = benchmarks[task_id][seed]
+    # benchmark = benchmarks[task_id][seed]
+    benchmark = model_space(
+        task_id=task_id,
+        seed=seed,
+        fidelity_choice=fidelity_choice,
+        data_path=data_path
+    )
     if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
         # creating a copy of the benchmark object prevents the collection of benchmarks shared
         # among workers to not bloat in memory and the data loads happen independently for each
@@ -96,7 +108,6 @@ def compute(evaluation: dict, benchmarks: dict=None) -> str:
         benchmark.valid_y, \
         benchmark.test_X, \
         benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
-    print(type(benchmark), obj_size(benchmark), obj_size(benchmark.train_X))
 
     # the lookup dict key for each evaluation is a 4-element tuple
     result = benchmark.objective_function(config, fidelity)
@@ -304,6 +315,7 @@ if __name__ == "__main__":
                 data_path=args.data_path
             )
             benchmarks[task_id][seed].load_data_from_openml()
+            break
     logger.info("Total size of {} benchmark objects in memory: {:.5f} MB".format(
         len(task_ids) * len(seeds), obj_size(benchmarks)
     ))
@@ -338,7 +350,7 @@ if __name__ == "__main__":
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
         num_workers = client.n_workers
-        client.distribute_data_to_workers(benchmarks)
+        # client.distribute_data_to_workers(benchmarks)
         logger.info("Dask Client information: {}".format(client.client))
     else:
         num_workers = args.n_workers
@@ -350,7 +362,7 @@ if __name__ == "__main__":
             # More than speeding up data management by Dask, creating the benchmark class objects
             # once and sharing it across all the workers mean that for each task-seed instance,
             # the validation split remains the same across evaluations
-            client.distribute_data_to_workers(benchmarks)
+            # client.distribute_data_to_workers(benchmarks)
             logger.info("Dask Client information: {}".format(client.client))
     logger.info("Executing with {} worker(s)".format(num_workers))
 
@@ -367,7 +379,10 @@ if __name__ == "__main__":
         combination = list(combination)
         combination[1] = map_to_config(x_cs, combination[1])
         combination[2] = map_to_config(z_cs, combination[2])
+        combination.append(args.data_path)  #  data_path = evaluation["data_path"]
+        combination.append(args.fidelity_choice)  # fidelity_choice = evaluation["fidelity_choice"]
         combination.append(i)
+        combination.append(param_space)
         if num_workers == 1:
             compute(return_dict(combination), benchmarks)
             continue
@@ -376,7 +391,7 @@ if __name__ == "__main__":
         # next combination to be submitted if client.is_worker_available() is True
         while True:
             if client.is_worker_available():
-                client.distribute_data_to_workers(benchmarks)
+                # client.distribute_data_to_workers(benchmarks)
                 # benchmarks should be provided as a second argument to compute() by dask as
                 # the benchmarks are already distributed across the workers
                 client.submit_job(compute, return_dict(combination))
