@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-import pickle
+import pickle5 as pickle
 import argparse
 
 import glom
@@ -10,6 +10,11 @@ from copy import deepcopy
 from loguru import logger
 from collections import OrderedDict
 from joblib.parallel import Parallel, parallel_backend, delayed
+
+# from multiprocessing.managers import BaseManager
+from multiprocessing import Manager, Lock
+lock = Lock()
+
 
 from utils.util import *
 
@@ -66,7 +71,7 @@ def update_table_with_new_entry(
 def save_task_file(task_id, task_dict, path, config_spaces, exp_args):
     obj = task_dict
     task_dict['config_spaces'] = config_spaces
-    task_dict['exp_args'] = exp_args.__dict__
+    task_dict['exp_args'] = exp_args
     old_file = os.path.join(path, "task_{}_old.pkl".format(task_id))
     new_file = os.path.join(path, "task_{}_new.pkl".format(task_id))
     if os.path.isfile(new_file):
@@ -81,6 +86,29 @@ def save_task_file(task_id, task_dict, path, config_spaces, exp_args):
     return
 
 
+def joblib_fn(filename, dump_path):
+    # ignore files that are named as 'task_*.pkl or run_*.log'
+    if (filename.split('_')[0] == "task" and filename.split('.')[-1] == "pkl") or \
+            (filename.split('_')[0] == "run" and filename.split('.')[-1] == "log") or \
+            os.path.isdir(os.path.join(dump_path, filename)):
+        return None
+    try:
+        with open(os.path.join(dump_path, filename), "rb") as f:
+            res = pickle.load(f)
+    except FileNotFoundError:
+        # if file was collected with os.listdir but deleted in the meanwhile, ignore it
+        return None
+    task_id = int(filename.split('/')[0].split('_')[0])
+    progress_id = int(filename.split('.pkl')[0].split('_')[-1])
+    output = (task_id, progress_id, res)
+    try:
+        # deleting data file that was processed
+        os.remove(os.path.join(dump_path, filename))
+    except FileNotFoundError:
+        pass
+    return output
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -91,7 +119,7 @@ if __name__ == "__main__":
                         help="The number of files to process per loop iteration")
     parser.add_argument("--config", type=str, default=None,
                         help="Full path to experiment config for which collator is running")
-    parser.add_argument("--n_jobs", type=int, default=1,
+    parser.add_argument("--n_jobs", type=int, default=2,
                         help="The number of parallel cores for speeding up file writes per task")
     args = parser.parse_args()
 
@@ -129,9 +157,7 @@ if __name__ == "__main__":
     print("Logging at {}/logs/collator_{}.log".format(path, log_suffix))
 
     initial_file_list = os.listdir(path)
-    file_count = 0
     task_datas = dict()
-    processing_time = 0
 
     while True:
         # list available tasks
@@ -151,8 +177,7 @@ if __name__ == "__main__":
         logger.info("\tsleeping...")
 
         # sleep to allow disk writes to be completed for the collected file names
-        sleep_time = sleep_wait - processing_time  # accounts for processing time in wait time
-        time.sleep(sleep_wait if sleep_time < 0 else sleep_time)
+        time.sleep(sleep_wait)
 
         _task_ids = retrieve_task_ids(file_list)
         logger.info("\tTask IDs found: {}".format(_task_ids))
@@ -163,21 +188,19 @@ if __name__ == "__main__":
 
         start = time.time()
         logger.info("\tStarting collection...")
-        for i, filename in enumerate(file_list, start=1):
-            logger.debug("\tProcessing {}/{}".format(i, len(file_list)), end='\r')
-            # ignore files that are named as 'task_*.pkl or run_*.log'
-            if (filename.split('_')[0] == "task" and filename.split('.')[-1] == "pkl") or \
-                    (filename.split('_')[0] == "run" and filename.split('.')[-1] == "log") or \
-                    os.path.isdir(os.path.join(dump_path, filename)):
-                continue
 
-            try:
-                with open(os.path.join(dump_path, filename), "rb") as f:
-                    res = pickle.load(f)
-            except FileNotFoundError:
-                # if file was collected with os.listdir but deleted in the meanwhile, ignore it
+        with parallel_backend(backend="multiprocessing", n_jobs=args.n_jobs):
+            batch_datas = Parallel()(
+                delayed(joblib_fn)(
+                    filename, dump_path
+                ) for i, filename in enumerate(file_list)
+            )
+        # TODO: some way to update the dicts asynchronolously to speed up large collections (~100k)
+        #  tried multiprocessing shared objects but couldn't resolve issues
+        for batch in batch_datas:
+            if batch is None:
                 continue
-
+            task_id, progress_id, res = batch
             # OrderedDict ensure consistency when building the hierarchy of dicts as lookup table
             # since the hyperparameter and fidelity names don't change, ordering them ensures
             # both storage and lookup can match
@@ -185,33 +208,21 @@ if __name__ == "__main__":
             fidelity = OrderedDict(res['info']['fidelity'])
             res['info'].pop('config')
             res['info'].pop('fidelity')
-            task_id = int(filename.split('/')[0].split('_')[0])
-            progress_id = int(filename.split('.pkl')[0].split('_')[-1])
             task_datas[task_id]['progress'] = max(task_datas[task_id]['progress'], progress_id)
             task_datas[task_id]['data'] = update_table_with_new_entry(
                 task_datas[task_id]['data'], res, config, fidelity
             )
-            file_count += 1
-
-            try:
-                # deleting data file that was processed
-                os.remove(os.path.join(dump_path, filename))
-            except FileNotFoundError:
-                continue
-
-        end = time.time()
-        processing_time = end - start
-        logger.info("\tFinished batch processing in {:.3f} seconds".format(processing_time))
+        logger.info("\tFinished batch processing in {:.3f} seconds".format(time.time() - start))
         logger.info("\tUpdating benchmark data files...")
 
-        with parallel_backend(backend="loky", n_jobs=args.n_jobs):
-            Parallel()(
-                delayed(save_task_file)(
-                    task_id, obj, output_path, config_spaces, exp_args
-                ) for task_id, obj in task_datas.items()
-            )
+        if len(task_datas.keys()) == 1:
+            save_task_file(task_id, task_datas[task_id], output_path, config_spaces, dict(exp_args))
+        else:
+            with parallel_backend(backend="multiprocessing", n_jobs=args.n_jobs):
+                Parallel()(
+                    delayed(save_task_file)(
+                        task_id, obj, output_path, config_spaces, dict(exp_args)
+                    ) for task_id, obj in task_datas.items()
+                )
         logger.info("\tContinuing to next batch")
         logger.info("\t{}".format("-" * 25))
-
-    logger.info("Done!")
-    logger.info("Total files processed: {}".format(file_count))
