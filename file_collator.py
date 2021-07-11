@@ -134,6 +134,7 @@ if __name__ == "__main__":
     processing_time = 0
 
     while True:
+        #TODO: possibly empty out task_datas
         # list available tasks
         task_ids = [int(tid) for tid in os.listdir(dump_path)]
         if len(task_ids) == 0:
@@ -158,6 +159,7 @@ if __name__ == "__main__":
         logger.info("\tTask IDs found: {}".format(_task_ids))
 
         for tid in _task_ids:
+            #TODO: load task_datas if available on disk
             if tid not in task_datas.keys():
                 task_datas[tid] = dict(progress=0, data=dict())
 

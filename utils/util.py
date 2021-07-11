@@ -384,6 +384,8 @@ class DaskHelper:
             # in the synchronous case, one worker is always available
             return True
         workers = self._get_n_workers()
+        #TODO: retrieve list of futures available with the client run an experiment with 2 client
+        # at the same scheduler, run job on one, check for pending futures from the other
         if len(self.futures) >= workers:
             # pause/wait if active worker count greater allocated workers
             return False
