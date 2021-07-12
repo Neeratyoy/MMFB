@@ -100,7 +100,7 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         # creating a copy of the benchmark object prevents the collection of benchmarks shared
         # among workers to not bloat in memory and the data loads happen independently for each
         # worker process, thus allowing the individual worker memory to stay within its limit
-        benchmark = deepcopy(benchmark)
+        # benchmark = deepcopy(benchmark)
         # load splits from specified path
         benchmark.train_X, \
         benchmark.train_y, \
@@ -108,7 +108,6 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         benchmark.valid_y, \
         benchmark.test_X, \
         benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
-
     # the lookup dict key for each evaluation is a 4-element tuple
     result = benchmark.objective_function(config, fidelity)
     result['info']['seed'] = seed
@@ -303,24 +302,30 @@ if __name__ == "__main__":
     logger.info("Seeds selected {}".format(seeds))
 
     # Loading benchmarks
-    benchmarks = dict()
-    for task_id in task_ids:
-        benchmarks[task_id] = dict()
-        for seed in seeds:
-            logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
-            benchmarks[task_id][seed] = param_space(
-                task_id=task_id,
-                seed=seed,
-                fidelity_choice=args.fidelity_choice,
-                data_path=args.data_path
-            )
-            benchmarks[task_id][seed].load_data_from_openml()
-            break
-    logger.info("Total size of {} benchmark objects in memory: {:.5f} MB".format(
-        len(task_ids) * len(seeds), obj_size(benchmarks)
-    ))
+    # benchmarks = dict()
+    # for task_id in task_ids:
+    #     benchmarks[task_id] = dict()
+    #     for seed in seeds:
+    #         logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
+    #         benchmarks[task_id][seed] = param_space(
+    #             task_id=task_id,
+    #             seed=seed,
+    #             fidelity_choice=args.fidelity_choice,
+    #             data_path=args.data_path
+    #         )
+    #         benchmarks[task_id][seed].load_data_from_openml()
+    #         break
+    # logger.info("Total size of {} benchmark objects in memory: {:.5f} MB".format(
+    #     len(task_ids) * len(seeds), obj_size(benchmarks)
+    # ))
     # Placeholder benchmark to retrieve parameter spaces
-    benchmark = benchmarks[task_ids[0]][seeds[0]]
+    # benchmark = benchmarks[task_ids[0]][seeds[0]]
+    benchmark = param_space(
+        task_id=task_ids[0],
+        seed=seeds[0],
+        fidelity_choice=args.fidelity_choice,
+        data_path=args.data_path
+    )
 
     # Saving a copy of the ConfigSpaces used for this run
     with open(os.path.join(base_path, "param_space.pkl"), "wb") as f:

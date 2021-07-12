@@ -377,16 +377,31 @@ class DaskHelper:
         else:
             self.futures.append(self.client.submit(func, x))
 
-    def is_worker_available(self, verbose=False):
+    def is_worker_available(self):
         """ Checks if at least one worker is available to run a job
         """
         if self.n_workers == 1:
             # in the synchronous case, one worker is always available
             return True
-        workers = self._get_n_workers()
-        #TODO: retrieve list of futures available with the client run an experiment with 2 client
-        # at the same scheduler, run job on one, check for pending futures from the other
-        if len(self.futures) >= workers:
+        n_workers = self._get_n_workers()
+        # Given multiple different benchmark processes can share the same pool of workers, to
+        # have a better estimate of queued jobs, need to retrieve information from the workers
+        # available. That is, the total count of `ready` jobs across all workers should be lesser
+        # than the number of available of workers with the current `client`.
+        if hasattr(self.client, "_scheduler_identity") and \
+                "workers" in self.client._scheduler_identity:
+            workers = self.client._scheduler_identity["workers"]
+            job_key = "ready"
+            in_mem_jobs = sum(list(
+                map(lambda k: workers[k]["metrics"][job_key], list(workers.keys()))
+            ))
+            if in_mem_jobs > n_workers:
+                # pause/wait if active worker count greater allocated workers
+                return False
+        # `self.futures` contains only the list of futures submitted by the main process that
+        # instantiated this class, which is adequate to check if workers available when workers
+        # are exclusive available to only this process.
+        if len(self.futures) >= n_workers:
             # pause/wait if active worker count greater allocated workers
             return False
         return True
