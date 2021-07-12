@@ -91,8 +91,7 @@ if __name__ == "__main__":
                         help="The number of files to process per loop iteration")
     parser.add_argument("--config", type=str, default=None,
                         help="Full path to experiment config for which collator is running")
-    parser.add_argument("--n_jobs", type=int, default=1,
-                        help="The number of parallel cores for speeding up file writes per task")
+
     args = parser.parse_args()
 
     sleep_wait = args.sleep
@@ -206,14 +205,8 @@ if __name__ == "__main__":
         logger.info("\tFinished batch processing in {:.3f} seconds".format(processing_time))
         logger.info("\tUpdating benchmark data files...")
 
-        with parallel_backend(backend="loky", n_jobs=args.n_jobs):
-            Parallel()(
-                delayed(save_task_file)(
-                    task_id, obj, output_path, config_spaces, exp_args
-                ) for task_id, obj in task_datas.items()
-            )
+        for task_id, obj in task_datas.items():
+            save_task_file(task_id, obj, output_path, config_spaces, exp_args)
+
         logger.info("\tContinuing to next batch")
         logger.info("\t{}".format("-" * 25))
-
-    logger.info("Done!")
-    logger.info("Total files processed: {}".format(file_count))

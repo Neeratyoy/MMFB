@@ -157,9 +157,10 @@ if __name__ == "__main__":
     print("Logging at {}/logs/collator_{}.log".format(path, log_suffix))
 
     initial_file_list = os.listdir(path)
-    task_datas = dict()
+    # task_datas = dict()
 
     while True:
+        task_datas = dict()
         # list available tasks
         task_ids = [int(tid) for tid in os.listdir(dump_path)]
         if len(task_ids) == 0:
@@ -184,7 +185,12 @@ if __name__ == "__main__":
 
         for tid in _task_ids:
             if tid not in task_datas.keys():
-                task_datas[tid] = dict(progress=0, data=dict())
+                filename = os.path.join(output_path, "task_{}_new.pkl".format(tid))
+                if os.path.isfile(filename):
+                    with open(filename, "rb") as f:
+                        task_datas[tid] = pickle.load(f)
+                else:
+                    task_datas[tid] = dict(progress=0, data=dict())
 
         start = time.time()
         logger.info("\tStarting collection...")
