@@ -389,7 +389,7 @@ if __name__ == "__main__":
         combination.append(i)
         combination.append(param_space)
         if num_workers == 1:
-            compute(return_dict(combination), benchmarks)
+            compute(return_dict(combination))  #, benchmarks)
             continue
         # for a combination selected, need to wait until it is submitted to a worker
         # client.submit_job() is an asynchronous call, followed by a break which allows the
@@ -400,6 +400,9 @@ if __name__ == "__main__":
                 # benchmarks should be provided as a second argument to compute() by dask as
                 # the benchmarks are already distributed across the workers
                 client.submit_job(compute, return_dict(combination))
+                # allow a job to be submitted to a worker such that the next round of available
+                # worker counts is a closer approximation to the actual availability
+                time.sleep(0.05)  # 50 milliseconds
                 break
             else:
                 client.fetch_futures(retries=1, wait_time=0.05)
