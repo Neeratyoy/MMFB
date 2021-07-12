@@ -9,14 +9,8 @@ from hpobench.benchmarks.ml.svm_benchmark import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 
+from run_benchmark_dask import param_space_dict
 from utils.util import get_discrete_configspace, load_yaml_args
-
-
-param_space_dict = dict(
-    rf=RandomForestBenchmark,
-    svm=SVMBenchmark,
-    histgb=HistGBBenchmark
-)
 
 
 def query(table, config, fidelity, seed=None):

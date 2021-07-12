@@ -12,4 +12,4 @@ seed: 1234
 space: svm
 task_id: 12
 x_grid_size: 25
-z_grid_size: 25
+z_grid_size: 10
