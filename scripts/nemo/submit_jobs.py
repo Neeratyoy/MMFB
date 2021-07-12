@@ -30,6 +30,7 @@ def input_args():
     parser.add_argument("--space", default=None, type=str)
     parser.add_argument("--exp_type", default="full", type=str, choices=["full", "toy"])
     parser.add_argument("--codedir", default="/home/fr/fr_fr/fr_nm217/Thesis/code/MMFB", type=str)
+    parser.add_argument("--sleep", default=5, type=float)
     args = parser.parse_args()
     return args
 
@@ -45,4 +46,4 @@ if __name__ == "__main__":
     for task_id in task_ids:
         edit_submit_script(args.codedir, args.space, args.exp_type, task_id)
         subprocess.call(["msub", script_path])
-        time.sleep(3)
+        time.sleep(args.sleep)
