@@ -142,7 +142,7 @@ if __name__ == "__main__":
         z_cs = pickle.load(f)
     exp_args = load_yaml_args(args.config)
     x_cs_discrete = get_discrete_configspace(x_cs, exp_args.x_grid_size)
-    z_cs_discrete = get_discrete_configspace(z_cs, exp_args.z_grid_size)
+    z_cs_discrete = get_discrete_configspace(z_cs, exp_args.z_grid_size, fidelity_space=True)
     config_spaces = dict(
         x=x_cs, x_discrete=x_cs_discrete, z=z_cs, z_discrete=z_cs_discrete
     )
