@@ -381,13 +381,16 @@ class DaskHelper:
         """ Checks if a worker can take a new job or not
 
         If a worker is executing (1) then it is certainly not free.
-        If a worker has more than 1 job(s) in memory or ready to be executed, the it is not free.
+        If a worker is not executing (0) and has no jobs ready (0) then it likely free.
+        If a worker has more than 1 job(s) in memory and ready to be executed, then it is not free.
         Else, it is considered free.
         """
         if worker_metrics["executing"]:
             return False
-        if worker_metrics["in_memory"] + worker_metrics["ready"] > 1:
-             return False
+        if not worker_metrics["executing"] and not worker_metrics["ready"]:
+            return True
+        if worker_metrics["in_memory"] * worker_metrics["ready"]:
+            return False
         return True
 
     def is_worker_available(self):

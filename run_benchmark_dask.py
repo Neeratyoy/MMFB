@@ -9,10 +9,11 @@ import warnings
 import argparse
 import itertools
 import numpy as np
+import multiprocessing
 from loguru import logger
 from copy import deepcopy
 from typing import Dict, Tuple
-from distributed import Client
+from distributed import Client, Lock
 from pympler.asizeof import asizeof
 
 from hpobench.benchmarks.ml.svm_benchmark import SVMBenchmark
@@ -46,7 +47,7 @@ def config2hash(config):
 
 
 def return_dict(combination: Tuple) -> Dict:
-    assert len(combination) == 9
+    assert len(combination) == 10
     evaluation = dict()
     evaluation["task_id"] = combination[0]
     evaluation["config"] = combination[1]
@@ -57,6 +58,7 @@ def return_dict(combination: Tuple) -> Dict:
     evaluation["fidelity_choice"] = combination[6]
     evaluation["id"] = combination[7]
     evaluation["space"] = combination[8]
+    evaluation["lock"] = combination[9]
     return evaluation
 
 
@@ -86,9 +88,11 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     fidelity_choice = evaluation["fidelity_choice"]
     i = evaluation["id"]
     model_space = evaluation["space"]
+    lock = evaluation["lock"]
     task_path = os.path.join(path, str(task_id))
     os.makedirs(task_path, exist_ok=True)
 
+    start = time.time()
     # benchmark = benchmarks[task_id][seed]
     benchmark = model_space(
         task_id=task_id,
@@ -102,14 +106,21 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         # worker process, thus allowing the individual worker memory to stay within its limit
         # benchmark = deepcopy(benchmark)
         # load splits from specified path
+        if isinstance(lock, Lock):
+            lock.acquire()
         benchmark.train_X, \
         benchmark.train_y, \
         benchmark.valid_X, \
         benchmark.valid_y, \
         benchmark.test_X, \
         benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
+        if isinstance(lock, Lock):
+            lock.release()
     # the lookup dict key for each evaluation is a 4-element tuple
+    end1 = time.time()
+    print("Time to load: {:.5f}".format(end1 - start))
     result = benchmark.objective_function(config, fidelity)
+    print("Time to evaluate: {:.5f}".format(time.time() - end1))
     result['info']['seed'] = seed
     # file_collator should collect the pickle files dumped below
     name = "{}/{}_{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed, i)
@@ -350,10 +361,12 @@ if __name__ == "__main__":
     logger.debug("Fidelity space grid size: {:.2f} MB".format(obj_size(grid_fidelity)))
 
     # Dask initialisation
+    lock = None
     if args.scheduler_file is not None and os.path.isfile(args.scheduler_file):
         logger.info("Connecting to scheduler...")
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
+        lock = Lock(str(task_ids[0]), client)  #{seed: Lock(str(seed), client) for seed in seeds}
         num_workers = client.n_workers
         # client.distribute_data_to_workers(benchmarks)
         logger.info("Dask Client information: {}".format(client.client))
@@ -388,6 +401,7 @@ if __name__ == "__main__":
         combination.append(args.fidelity_choice)  # fidelity_choice = evaluation["fidelity_choice"]
         combination.append(i)
         combination.append(param_space)
+        combination.append(lock)
         if num_workers == 1:
             compute(return_dict(combination))  #, benchmarks)
             continue
@@ -400,8 +414,8 @@ if __name__ == "__main__":
                 # benchmarks should be provided as a second argument to compute() by dask as
                 # the benchmarks are already distributed across the workers
                 client.submit_job(compute, return_dict(combination))
-                # allow a job to be submitted to a worker such that the next round of available
-                # worker counts is a closer approximation to the actual availability
+                # sleep allows a job to be submitted to a worker such that the next round of
+                # available worker counts is a closer approximation to the actual availability
                 time.sleep(0.05)  # 50 milliseconds
                 break
             else:
