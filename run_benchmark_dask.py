@@ -85,6 +85,17 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     seed = evaluation["seed"]
     path = evaluation["path"]
     data_path = evaluation["data_path"]
+    # When workers run on Nemo, each submitted job creates a tmp directory for that job as long as
+    # the job is alive. This is an SSD disk which should allow fast reads of data splits. Moreover,
+    # this directory being unique to the worker(s) running this function, prevents parallel access
+    # of the data splits and should be faster. In case, this directory doesn't exist, the default
+    # data_path passed will be used. Therefore, the check that openml_splits/[task_id] exists
+    # under the tmp directory is important to ensure no failures.
+    if "TMPDIR" in os.environ:
+        tmp_path = os.path.join(os.environ["TMPDIR"], "openml_splits", str(task_id))
+        if os.path.isdir(tmp_path):
+            data_path = tmp_path
+    print("Data path: ", data_path)
     fidelity_choice = evaluation["fidelity_choice"]
     i = evaluation["id"]
     model_space = evaluation["space"]
@@ -101,13 +112,9 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         data_path=data_path
     )
     if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
-        # creating a copy of the benchmark object prevents the collection of benchmarks shared
-        # among workers to not bloat in memory and the data loads happen independently for each
-        # worker process, thus allowing the individual worker memory to stay within its limit
-        # benchmark = deepcopy(benchmark)
-        # load splits from specified path
         if isinstance(lock, Lock):
             lock.acquire()
+        # load splits from specified path
         benchmark.train_X, \
         benchmark.train_y, \
         benchmark.valid_X, \
