@@ -6,6 +6,7 @@ import itertools
 import numpy as np
 from collections import OrderedDict
 
+from hpobench.benchmarks.ml.ml_benchmark_template import metrics
 from hpobench.benchmarks.ml.svm_benchmark import SVMBenchmark
 from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
 from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
@@ -75,7 +76,10 @@ if __name__ == "__main__":
         param_list.append(hp.sequence)
 
     count = 0
-    incumbents = dict(train_scores=np.inf, val_scores=np.inf, test_scores=np.inf)
+    incumbents = dict()
+    for m in metrics.keys():
+        incumbents[m] = dict(train_scores=np.inf, val_scores=np.inf, test_scores=np.inf)
+
     for entry in itertools.product(*param_list):
         key_path = entry
         # key_path = [np.float32(_key) for _key in key_path]
@@ -86,15 +90,18 @@ if __name__ == "__main__":
         for seed in val.keys():
             count += 1
             print(count, seed, val[seed], '\n')
-            for k, v in incumbents.items():
-                if 1 - val[seed]['info'][k]['acc'] < v:  # loss = 1 - accuracy
-                    incumbents[k] = 1 - val[seed]['info'][k]['acc']
+            for m in metrics.keys():
+                for k, v in incumbents[m].items():
+                    if 1 - val[seed]['info'][k][m] < v:  # loss = 1 - accuracy
+                        incumbents[m][k] = 1 - val[seed]['info'][k][m]
     print(incumbents)
-    table['global_min'] = dict(
-        train=incumbents['train_scores'],
-        valid=incumbents['val_scores'],
-        test=incumbents['test_scores']
-    )
+    table['global_min'] = dict()
+    for m in metrics.keys():
+        table['global_min'][m] = dict(
+            train=incumbents[m]["train_scores"],
+            val=incumbents[m]["val_scores"],
+            test=incumbents[m]["test_scores"]
+        )
     if count != table['progress']:
         raise ValueError("Count mismatch: {} vs {}".format(count, table['progress']))
     with open(args.path, "wb") as f:
