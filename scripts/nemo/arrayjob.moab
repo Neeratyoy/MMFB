@@ -1,0 +1,30 @@
+#!/bin/bash
+#MOAB -N ARRAYJOB
+#MSUB -l nodes=1:ppn=20
+#MSUB -l walltime=95:00:00
+#MSUB -N mmfb-workers
+#MSUB -o /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
+#MSUB -e /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
+
+#
+# This is a workaround for a know bug.
+# Arrayjobs need to be given the output directory
+# cd $HOME/arrayjob
+# Now call the programm which does the work depending on the job id
+# python divide-and-conquer.py $MOAB_JOBARRAYINDEX
+
+nworkers=20
+
+codedir=$HOME'/Thesis/code/MMFB'
+wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
+
+source $HOME/miniconda3/bin/activate mmfb
+
+export PYTHONPATH=$codedir:$PYTHONPATH
+export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
+
+id=$MOAB_JOBARRAYINDEX
+
+echo "TMPDIR: "$TMPDIR
+
+bash $codedir/scripts/dask/deploy_workers.sh $nworkers $codedir/tmp_dump/scheduler.json $wspace $id
