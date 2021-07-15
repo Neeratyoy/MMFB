@@ -416,11 +416,13 @@ if __name__ == "__main__":
         # client.submit_job() is an asynchronous call, followed by a break which allows the
         # next combination to be submitted if client.is_worker_available() is True
         while True:
-            if client.is_worker_available():
+            workers = client.is_worker_available()
+            if workers:
                 # client.distribute_data_to_workers(benchmarks)
                 # benchmarks should be provided as a second argument to compute() by dask as
                 # the benchmarks are already distributed across the workers
-                client.submit_job(compute, return_dict(combination))
+                logger.debug("Available worker count: {}".format(len(workers)))
+                client.submit_job(compute, return_dict(combination), workers)
                 # sleep allows a job to be submitted to a worker such that the next round of
                 # available worker counts is a closer approximation to the actual availability
                 time.sleep(0.05)  # 50 milliseconds

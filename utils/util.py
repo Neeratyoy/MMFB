@@ -371,11 +371,11 @@ class DaskHelper:
         if hasattr(self, "client") and isinstance(self, Client):
             self.client.close()
 
-    def submit_job(self, func, x):
+    def submit_job(self, func, x, workers):
         if self.shared_data is not None:
-            self.futures.append(self.client.submit(func, x, self.shared_data))
+            self.futures.append(self.client.submit(func, x, self.shared_data, workers=workers))
         else:
-            self.futures.append(self.client.submit(func, x))
+            self.futures.append(self.client.submit(func, x, workers=workers))
 
     def _check_a_worker(self, worker_metrics):
         """ Checks if a worker can take a new job or not
@@ -405,19 +405,20 @@ class DaskHelper:
         # are exclusive available to only this process
         if len(self.futures) >= n_workers:
             # pause/wait if active worker count greater allocated workers
-            return False
+            return []  #False
         # Given multiple different benchmark processes can share the same pool of workers, to
         # have a better estimate of queued jobs, need to retrieve information from all workers
-        if hasattr(self.client, "_scheduler_identity") and \
-                "workers" in self.client._scheduler_identity:
-            workers = self.client._scheduler_identity["workers"]
-            worker_status = list(
-                map(lambda k: self._check_a_worker(workers[k]['metrics']), list(workers.keys()))
-            )
-            # If at least one of the available worker(s) are free, a True signal is returned
-            return np.any(worker_status)
-
-        return True
+        # if hasattr(self.client, "_scheduler_identity") and \
+        #         "workers" in self.client._scheduler_identity:
+        workers = self.client._scheduler_identity["workers"]
+        # selecting a random worker as placeholder
+        available = [np.random.choice(list(self.client._scheduler_identity["workers"].keys()))]
+        worker_status = list(
+            map(lambda k: self._check_a_worker(workers[k]['metrics']), list(workers.keys()))
+        )
+        # If at least one of the available worker(s) are free, a True signal is returned
+        available = np.array(list(workers.keys()))[np.where(worker_status)[0]].tolist()
+        return available
 
     def fetch_futures(self, retries=1, wait_time=0.05):
         """ Removes the futures which are done from the list
