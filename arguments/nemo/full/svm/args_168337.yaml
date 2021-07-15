@@ -11,5 +11,5 @@ scheduler_file: /home/fr/fr_fr/fr_nm217/Thesis/code/MMFB/tmp_dump/scheduler.json
 seed: 1234
 space: svm
 task_id: 168337
-x_grid_size: 25
-z_grid_size: 10
+x_grid_size: 21
+z_grid_size: 5
