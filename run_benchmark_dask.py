@@ -92,7 +92,7 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     # data_path passed will be used. Therefore, the check that openml_splits/[task_id] exists
     # under the tmp directory is important to ensure no failures.
     if "TMPDIR" in os.environ:
-        tmp_path = os.path.join(os.environ["TMPDIR"], "openml_splits", str(task_id))
+        tmp_path = os.path.join(os.environ["TMPDIR"], "openml_splits")
         if os.path.isdir(tmp_path):
             data_path = tmp_path
     print("Data path: ", data_path)
