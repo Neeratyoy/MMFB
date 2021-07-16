@@ -191,7 +191,7 @@ def get_parameter_grid(
                 ))
                 grid = np.clip(grid, hp.lower, hp.upper).astype(np.float32)
             else:
-                grid = np.linspace(hp.lower, hp.upper, grid_step_size).astype(np.float32)
+                grid = np.linspace(hp.lower, hp.upper, grid_step_size, dtype=np.float32)
             grid = grid.astype(int) if isinstance(hp, CS.UniformIntegerHyperparameter) else grid
             param_ranges.append(grid)
     full_grid = itertools.product(*param_ranges)
@@ -239,7 +239,7 @@ def get_fidelity_grid(
                 ))
                 grid = np.clip(grid, hp.lower, hp.upper).astype(np.float32)
             else:
-                grid = np.linspace(hp.lower, hp.upper, grid_step_size).astype(np.float32)
+                grid = np.linspace(hp.lower, hp.upper, grid_step_size, dtype=np.float32)
             if include_sh_budgets:
                 hb_grid = np.array([])
                 for eta in selected_etas:

@@ -16,10 +16,7 @@ from typing import Dict, Tuple
 from distributed import Client, Lock
 from pympler.asizeof import asizeof
 
-from hpobench.benchmarks.ml.svm_benchmark import SVMBenchmark
-from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
-from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
-from hpobench.benchmarks.ml.xgboost_benchmark import XGBoostBenchmark
+from hpobench.benchmarks.ml import *
 
 from utils.util import *
 from utils.util import all_task_ids_by_in_mem_size, read_openml_splits
@@ -33,6 +30,7 @@ _logger_props = {
 }
 
 param_space_dict = dict(
+    lr=LRBenchmark,
     rf=RandomForestBenchmark,
     svm=SVMBenchmark,
     histgb=HistGBBenchmark,
