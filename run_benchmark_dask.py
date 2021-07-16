@@ -1,20 +1,11 @@
-import os
 import sys
-import time
-import yaml
-import openml
 import pickle
 import hashlib
 import warnings
 import argparse
-import itertools
-import numpy as np
-import multiprocessing
+from typing import Dict
 from loguru import logger
-from copy import deepcopy
-from typing import Dict, Tuple
-from distributed import Client, Lock
-from pympler.asizeof import asizeof
+from distributed import Lock
 
 from hpobench.benchmarks.ml import *
 
