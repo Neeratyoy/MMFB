@@ -7,9 +7,9 @@ fidelity_choice: 1
 n_seeds: 3
 data_path: "./tmp_dump/openml_splits"
 output_path: "./tmp_dump"
-n_workers: 4 #null
+n_workers: null
 task_id: null
-scheduler_file: null #"./tmp_dump/scheduler.json"
+scheduler_file: "./tmp_dump/scheduler.json"
 seed: 1234
 exp_name: "test"
 restart_id: 0
