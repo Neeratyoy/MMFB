@@ -14,4 +14,4 @@ source $HOME/miniconda3/bin/activate mmfb
 export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
-bash $codedir/scripts/dask/deploy_scheduler.sh $codedir/tmp_dump/scheduler.json
+bash $codedir/scripts/dask/deploy_scheduler.sh $wspace/scheduler/scheduler.json

@@ -17,4 +17,4 @@ export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
 id=$1
 
-bash $codedir/scripts/dask/deploy_workers.sh $nworkers $codedir/tmp_dump/scheduler.json $wspace $id
+bash $codedir/scripts/dask/deploy_workers.sh $nworkers $wspace/scheduler/scheduler.json $wspace $id

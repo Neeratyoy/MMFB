@@ -7,7 +7,7 @@ n_tasks: null
 n_workers: null
 output_path: /work/ws/nemo/fr_nm217-hpobench-0/
 restart_id: 0
-scheduler_file: /home/fr/fr_fr/fr_nm217/Thesis/code/MMFB/tmp_dump/scheduler.json
+scheduler_file: /work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler.json
 seed: 1234
 space: xgboost
 task_id: 9977
