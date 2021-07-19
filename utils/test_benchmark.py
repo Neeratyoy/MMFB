@@ -106,3 +106,4 @@ if __name__ == "__main__":
         raise ValueError("Count mismatch: {} vs {}".format(count, table['progress']))
     with open(args.path, "wb") as f:
         pickle.dump(table, f)
+    print("\nTable file updated with global minimas!")
