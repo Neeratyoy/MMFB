@@ -54,7 +54,8 @@ def update_table_with_new_entry(
     seed = new_entry['info']['seed']
     key_nest = []
     for k, v in config.items():
-        key_nest.append(np.float32(v))
+        v = str(v) if isinstance(v, str) else np.float32(v)
+        key_nest.append(v)
         if glom.glom(main_data, glom.Path(*key_nest), default=None) is None:
             glom.assign(main_data, glom.Path(*key_nest), dict())
     for k, v in fidelity.items():
