@@ -23,6 +23,7 @@ _logger_props = {
 param_space_dict = dict(
     lr=LRBenchmark,
     rf=RandomForestBenchmark,
+    nn=NNBenchmark,
     svm=SVMBenchmark,
     histgb=HistGBBenchmark,
     xgboost=XGBoostBenchmark,
