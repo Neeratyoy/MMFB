@@ -37,4 +37,4 @@ def plot_comparison(plt, path, space, task_id, global_best=0, eval_type="val"):
     plt.ylabel("Loss regret")
     plt.legend()
     filename = "{}_{}_{}".format(space, task_id, eval_type)
-    plt.savefig(os.path.join(path, space, "{}_{}_{}.png".format(space, task_id, eval_type)))
+    plt.savefig(os.path.join(path, space, "{}.png".format(filename)))
