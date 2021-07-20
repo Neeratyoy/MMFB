@@ -21,4 +21,4 @@ export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 echo "Collecting from "$path
 
 PYTHONPATH=$codedir python3 $codedir/file_collator_joblib.py --sleep $sleep --path $path \
-  --config $codedir'/arguments/nemo/full/'$model'_args.yaml' --n_jobs $njobs
+  --config $codedir'/arguments/nemo/full/'$space'_args.yaml' --n_jobs $njobs
