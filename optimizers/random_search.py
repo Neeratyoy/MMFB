@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from hpobench.benchmarks.ml import TabularBenchmark
+from hpobench.benchmarks.ml.ml_benchmark_template import metrics
 
 
 def input_arguments():
@@ -26,6 +27,19 @@ def input_arguments():
         default=None,
         type=int,
         help="number of function evaluations"
+    )
+    parser.add_argument(
+        "--metrics",
+        default="acc",
+        type=str,
+        choices=list(metrics.keys()),
+        help="score metrics to choose from"
+    )
+    parser.add_argument(
+        "--test",
+        default=False,
+        action="store_true",
+        help="to return results on test split"
     )
     parser.add_argument(
         "--mf",
@@ -51,6 +65,7 @@ if __name__ == "__main__":
     space = benchmark.exp_args['space']
     max_fidelity = benchmark.get_max_fidelity()
     global_best = benchmark.get_global_min()['val']
+    eval = "test" if args.test else "val"
 
     full_trace = []
     trace = []
@@ -63,17 +78,23 @@ if __name__ == "__main__":
         if not args.mf:
             for k, v in max_fidelity.items():
                 fidelity[k] = v
-        res = benchmark.objective_function(config, fidelity)
+        if args.test:
+            res = benchmark.objective_function_test(config, fidelity, metric=args.metrics)
+        else:
+            res = benchmark.objective_function(config, fidelity, metric=args.metrics)
         if res["function_value"] < inc:
             inc = res["function_value"]
         trace.append(inc - global_best)
         cost.append(res["cost"])
         full_trace.append(res)
     plt.plot(np.cumsum(cost), trace, label="RS")
-    # plt.xscale("log")
+    plt.xscale("log")
     plt.yscale("log")
     plt.title("Task ID {} for {}".format(task_id, space))
-    filename = "{}_{}_{}".format(task_id, space, args.mf)
+    plt.xlabel("Wallclock time in seconds")
+    plt.ylabel("Loss regret")
+    plt.legend()
+    filename = "rs_{}_{}_{}_{}".format(task_id, space, args.mf, args.test)
     plt.savefig(os.path.join(args.output_path, "{}.png".format(filename)))
     with open(os.path.join(args.output_path, "{}.pkl".format(filename)), "wb") as f:
         pickle.dump(full_trace, f)

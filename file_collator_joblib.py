@@ -73,6 +73,8 @@ def save_task_file(task_id, task_dict, path, config_spaces, exp_args):
     obj = task_dict
     task_dict['config_spaces'] = config_spaces
     task_dict['exp_args'] = exp_args
+    task_dict['exp_args']['task_id'] = task_id
+    task_dict['exp_args']['n_tasks'] = None
     old_file = os.path.join(path, "task_{}_old.pkl".format(task_id))
     new_file = os.path.join(path, "task_{}_new.pkl".format(task_id))
     if os.path.isfile(new_file):
