@@ -71,8 +71,10 @@ if __name__ == "__main__":
     space = benchmark.exp_args['space']
     max_fidelity = benchmark.get_max_fidelity()
     global_best = benchmark.get_global_min()['val']
-    eval = "test" if args.test else "val"
-    os.makedirs(args.output_path, exist_ok=True)
+    eval_type = "test" if args.test else "val"
+    fidelity_type = "multi" if args.mf else "full"
+    output_path = os.path.join(args.output_path, space, str(task_id))
+    os.makedirs(output_path, exist_ok=True)
 
     full_trace = []
     trace = []
@@ -104,7 +106,7 @@ if __name__ == "__main__":
     plt.xlabel("Wallclock time in seconds")
     plt.ylabel("Loss regret")
     plt.legend()
-    filename = "rs_{}_{}_{}_{}".format(task_id, space, args.mf, args.test)
-    plt.savefig(os.path.join(args.output_path, "{}.png".format(filename)))
-    with open(os.path.join(args.output_path, "{}.pkl".format(filename)), "wb") as f:
+    filename = "rs_{}_{}_{}_{}".format(space, task_id, eval_type, fidelity_type)
+    plt.savefig(os.path.join(output_path, "{}.png".format(filename)))
+    with open(os.path.join(output_path, "{}.pkl".format(filename)), "wb") as f:
         pickle.dump(full_trace, f)

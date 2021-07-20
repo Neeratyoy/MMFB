@@ -30,6 +30,17 @@ def target_function(config, budget, **kwargs):
     return res
 
 
+def process_history_for_plotting(history):
+    full_trace = []
+    for h in history:
+        res = dict()
+        res['function_value'] = h[1]
+        res['cost'] = h[2]
+        res["info"] = h[-1]
+        full_trace.append(res)
+    return full_trace
+
+
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
@@ -92,8 +103,9 @@ if __name__ == "__main__":
         assert "Supports only multi-fidelity (1-d) and not multi-multi-fidelity (>1-d)!"
     fidelity_name, min_budget, max_budget = fidelity_info[0]
     global_best = benchmark.get_global_min()['val']
-    eval = "test" if args.test else "val"
-    os.makedirs(args.output_path, exist_ok=True)
+    eval_type = "test" if args.test else "val"
+    output_path = os.path.join(args.output_path, space, str(task_id))
+    os.makedirs(output_path, exist_ok=True)
 
     dehb = DEHB(
         f=target_function, cs=benchmark.x_cs,
@@ -114,7 +126,7 @@ if __name__ == "__main__":
     plt.xlabel("Wallclock time in seconds")
     plt.ylabel("Loss regret")
     plt.legend()
-    filename = "dehb_{}_{}_{}".format(task_id, space, args.test)
-    plt.savefig(os.path.join(args.output_path, "{}.png".format(filename)))
-    with open(os.path.join(args.output_path, "{}.pkl".format(filename)), "wb") as f:
-        pickle.dump(full_trace, f)
+    filename = "dehb_{}_{}_{}".format(space, task_id, eval_type)
+    plt.savefig(os.path.join(output_path, "{}.png".format(filename)))
+    with open(os.path.join(output_path, "{}.pkl".format(filename)), "wb") as f:
+        pickle.dump(process_history_for_plotting(full_trace), f)
