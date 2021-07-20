@@ -102,8 +102,8 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         data_path=data_path
     )
     if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
-        if isinstance(lock, Lock):
-            lock.acquire()
+        # if isinstance(lock, Lock):
+        #     lock.acquire()
         # load splits from specified path
         benchmark.train_X, \
         benchmark.train_y, \
@@ -111,8 +111,8 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         benchmark.valid_y, \
         benchmark.test_X, \
         benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
-        if isinstance(lock, Lock):
-            lock.release()
+        # if isinstance(lock, Lock):
+        #     lock.release()
     # the lookup dict key for each evaluation is a 4-element tuple
     end1 = time.time()
     print("Time to load: {:.5f}".format(end1 - start))
