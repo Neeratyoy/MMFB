@@ -29,7 +29,7 @@ def input_arguments():
         help="number of function evaluations"
     )
     parser.add_argument(
-        "--metrics",
+        "--metric",
         default="acc",
         type=str,
         choices=list(metrics.keys()),
@@ -53,6 +53,12 @@ def input_arguments():
         type=str,
         help="output path to dump optimisation trace and plot"
     )
+    parser.add_argument(
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="prints progress to stdout"
+    )
     args = parser.parse_args()
     return args
 
@@ -66,28 +72,32 @@ if __name__ == "__main__":
     max_fidelity = benchmark.get_max_fidelity()
     global_best = benchmark.get_global_min()['val']
     eval = "test" if args.test else "val"
+    os.makedirs(args.output_path, exist_ok=True)
 
     full_trace = []
     trace = []
     inc = np.inf
     cost = []
     for i in range(1, args.fevals + 1):
-        print("{:<6}/{:<6}".format(i, args.fevals), end='\r')
+        if args.verbose:
+            print("{:<6}/{:<6}".format(i, args.fevals), end='\r')
         config = benchmark.x_cs.sample_configuration()
         fidelity = benchmark.z_cs.sample_configuration()
         if not args.mf:
             for k, v in max_fidelity.items():
                 fidelity[k] = v
         if args.test:
-            res = benchmark.objective_function_test(config, fidelity, metric=args.metrics)
+            res = benchmark.objective_function_test(config, fidelity, metric=args.metric)
         else:
-            res = benchmark.objective_function(config, fidelity, metric=args.metrics)
+            res = benchmark.objective_function(config, fidelity, metric=args.metric)
         if res["function_value"] < inc:
             inc = res["function_value"]
-        trace.append(inc - global_best)
+        trace.append(inc)
         cost.append(res["cost"])
         full_trace.append(res)
-    plt.plot(np.cumsum(cost), trace, label="RS")
+
+    plt.tight_layout()
+    plt.plot(np.cumsum(cost), np.array(trace) - global_best, label="RS")
     plt.xscale("log")
     plt.yscale("log")
     plt.title("Task ID {} for {}".format(task_id, space))
