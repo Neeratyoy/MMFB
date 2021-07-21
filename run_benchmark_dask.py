@@ -275,9 +275,6 @@ if __name__ == "__main__":
     else:
         raise ValueError("Should specify either n_tasks or task_id, not both!")
 
-    # Setting seed
-    np.random.seed(args.seed)
-
     # Creating storage directories
     base_path = os.path.join(os.getcwd(), args.output_path, args.space)
     os.makedirs(base_path, exist_ok=True)
@@ -305,6 +302,8 @@ if __name__ == "__main__":
     # Load tasks
     logger.info("Loaded AutoML benchmark suite from OpenML for {} tasks".format(args.n_tasks))
 
+    # Setting seed
+    np.random.seed(args.seed)
     # Selecting seeds
     seeds = np.random.randint(1, 10000, size=args.n_seeds)
     logger.info("Seeds selected {}".format(seeds))
@@ -327,7 +326,6 @@ if __name__ == "__main__":
     #     len(task_ids) * len(seeds), obj_size(benchmarks)
     # ))
     # Placeholder benchmark to retrieve parameter spaces
-    # benchmark = benchmarks[task_ids[0]][seeds[0]]
     benchmark = param_space(
         task_id=task_ids[0],
         seed=seeds[0],
@@ -363,7 +361,7 @@ if __name__ == "__main__":
         logger.info("Connecting to scheduler...")
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
-        lock = Lock(str(task_ids[0]), client)  #{seed: Lock(str(seed), client) for seed in seeds}
+        lock = Lock(str(task_ids[0]), client)
         num_workers = client.n_workers
         # client.distribute_data_to_workers(benchmarks)
         logger.info("Dask Client information: {}".format(client.client))
@@ -394,8 +392,8 @@ if __name__ == "__main__":
         combination = list(combination)
         combination[1] = map_to_config(x_cs, combination[1])
         combination[2] = map_to_config(z_cs, combination[2])
-        combination.append(args.data_path)  #  data_path = evaluation["data_path"]
-        combination.append(args.fidelity_choice)  # fidelity_choice = evaluation["fidelity_choice"]
+        combination.append(args.data_path)
+        combination.append(args.fidelity_choice)
         combination.append(i)
         combination.append(param_space)
         combination.append(lock)
@@ -418,11 +416,11 @@ if __name__ == "__main__":
                 time.sleep(0.05)  # 50 milliseconds
                 break
             else:
-                client.fetch_futures(retries=1, wait_time=0.05)
+                client.fetch_futures(retries=2, wait_time=0.1)  # 100 milliseconds
     if num_workers > 1 and client.is_worker_alive():
         logger.info("Waiting for pending workers...")
         while num_workers > 1 and client.is_worker_alive():
-            client.fetch_futures(retries=1, wait_time=0.05)
+            client.fetch_futures(retries=2, wait_time=0.1)  # 100 milliseconds
     end = time.time()
 
     logger.info(
