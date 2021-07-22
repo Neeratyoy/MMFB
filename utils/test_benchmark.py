@@ -31,6 +31,16 @@ def query(table, config, fidelity, seed=None):
     return val
 
 
+def dump_file(missing, path, task_id, space):
+    output_path = path.split("/")[:-1]
+    output_path.append("{}_{}_missing.txt".format(space, task_id))
+    output_path = os.path.join(*output_path)
+    missing = [str(ids) for ids in missing]
+    with open(output_path, "w") as f:
+        f.writelines("\n".join(missing))
+    return output_path
+
+
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
@@ -66,6 +76,12 @@ if __name__ == "__main__":
     z = config_spaces['z']
     z_discrete = get_discrete_configspace(z, exp_args['z_grid_size'], fidelity_space=True)
     table['config_spaces']['z_discrete'] = z_discrete
+    n_seeds = exp_args["n_seeds"]
+    exp_seed = exp_args["seed"]
+    np.random.seed(exp_seed)
+    seeds = np.random.randint(1, 10000, size=n_seeds)
+    task_id = exp_args["task_id"]
+    space = exp_args["space"]
 
     param_list = []
     for name in np.sort(x_discrete.get_hyperparameter_names()):
@@ -74,26 +90,26 @@ if __name__ == "__main__":
     for name in np.sort(z_discrete.get_hyperparameter_names()):
         hp = z_discrete.get_hyperparameter(str(name))
         param_list.append(hp.sequence)
-
+    param_list.append(seeds)
     count = 0
     incumbents = dict()
     for m in metrics.keys():
         incumbents[m] = dict(train_scores=np.inf, val_scores=np.inf, test_scores=np.inf)
-
-    for entry in itertools.product(*param_list):
+    missing = []
+    for count, entry in enumerate(itertools.product(*param_list), start=1):
         key_path = entry
         # key_path = [np.float32(_key) for _key in key_path]
         val = glom.glom(table['data'], glom.Path(*key_path), default=None)
         if val is None:
-            print(key_path)
-            raise ValueError("Table contains no entry for given config-fidelity combination!")
-        for seed in val.keys():
-            count += 1
-            print(count, seed, val[seed], '\n')
-            for m in metrics.keys():
-                for k, v in incumbents[m].items():
-                    if 1 - val[seed]['info'][k][m] < v:  # loss = 1 - accuracy
-                        incumbents[m][k] = 1 - val[seed]['info'][k][m]
+            # print(key_path)
+            # raise ValueError("Table contains no entry for given config-fidelity-seed combination!")
+            missing.append(count)
+            continue
+        print(count, val, '\n')
+        for m in metrics.keys():
+            for k, v in incumbents[m].items():
+                if 1 - val['info'][k][m] < v:  # loss = 1 - accuracy
+                    incumbents[m][k] = 1 - val['info'][k][m]
     print(incumbents)
     table['global_min'] = dict()
     for m in metrics.keys():
@@ -102,6 +118,10 @@ if __name__ == "__main__":
             val=incumbents[m]["val_scores"],
             test=incumbents[m]["test_scores"]
         )
+    assert len(missing) == 0, "Incomplete collection: {} missing evaluations!\n" \
+                              "Dumping missing indexes at {}".format(
+        len(missing), dump_file(missing, args.path, task_id, space)
+    )
     # if count != table['progress']:
     #     raise ValueError("Count mismatch: {} vs {}".format(count, table['progress']))
     with open(args.path, "wb") as f:
