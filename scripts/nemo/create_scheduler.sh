@@ -14,4 +14,11 @@ source $HOME/miniconda3/bin/activate mmfb
 export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
-bash $codedir/scripts/dask/deploy_scheduler.sh $wspace/scheduler/scheduler.json
+# important for Dask to not fail on large cluster setups
+export DASK_DISTRIBUTED__SCHEDULER__ALLOWED_FAILURES=10
+export DASK_DISTRIBUTED__COMM__TIMEOUTS__CONNECT=60
+export DASK_DISTRIBUTED__COMM__RETRY__COUNT=5
+
+name=$1
+
+bash $codedir/scripts/dask/deploy_scheduler.sh $wspace"/scheduler/"$name".json"
