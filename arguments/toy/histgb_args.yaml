@@ -1,7 +1,7 @@
 space: "histgb"
 n_tasks: 1
 x_grid_size: 3
-z_grid_size: 3
+z_grid_size: 0
 include_SH: True
 fidelity_choice: 1
 n_seeds: 1

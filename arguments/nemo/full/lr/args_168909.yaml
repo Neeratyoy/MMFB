@@ -7,9 +7,9 @@ n_tasks: null
 n_workers: null
 output_path: /work/ws/nemo/fr_nm217-hpobench-0/
 restart_id: 0
-scheduler_file: /work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler.json
+scheduler_file: /work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler_lr.json
 seed: 1234
 space: lr
 task_id: 168909
-x_grid_size: 10
-z_grid_size: 10
+x_grid_size: 25
+z_grid_size: 0
