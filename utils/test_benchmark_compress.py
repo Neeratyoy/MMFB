@@ -1,9 +1,11 @@
 import os
+import json
 import glom
 import pickle
 import argparse
 import itertools
 import numpy as np
+import pandas as pd
 from collections import OrderedDict
 
 from hpobench.benchmarks.ml.ml_benchmark_template import metrics
@@ -39,6 +41,18 @@ def dump_file(missing, path, task_id, space):
     with open(output_path, "w") as f:
         f.writelines("\n".join(missing))
     return output_path
+
+
+def search_benchmark(entry, df):
+    mask = np.array([True] * df.shape[0])
+    for i, param in enumerate(df.drop("result", axis=1).columns):
+        mask *= df[param].values == entry[i]
+    idx = np.where(mask)
+    if len(idx) != 1:
+        return None
+    idx = idx[0][0]
+    result = df.iloc[idx]["result"]
+    return result
 
 
 def input_arguments():
@@ -84,13 +98,19 @@ if __name__ == "__main__":
     space = exp_args["space"]
 
     param_list = []
+    param_names = []
     for name in np.sort(x_discrete.get_hyperparameter_names()):
         hp = x_discrete.get_hyperparameter(str(name))
         param_list.append(hp.sequence)
+        param_names.append(hp.name)
     for name in np.sort(z_discrete.get_hyperparameter_names()):
         hp = z_discrete.get_hyperparameter(str(name))
         param_list.append(hp.sequence)
+        param_names.append(hp.name)
     param_list.append(seeds)
+    param_names.append("seed")
+    param_names.append("result")
+    df = pd.DataFrame([], columns=param_names)
     count = 0
     incumbents = dict()
     for m in metrics.keys():
@@ -103,11 +123,16 @@ if __name__ == "__main__":
         if val is None:
             missing.append(count)
             continue
+        entry = [np.float32(e) for e in entry]
+        entry.append(val)
+        _df = pd.DataFrame([entry], index=[count], columns=param_names)
+        df = df.append(_df)
         print(count, val, '\n')
         for m in metrics.keys():
             for k, v in incumbents[m].items():
                 if 1 - val['info'][k][m] < v:  # loss = 1 - accuracy
                     incumbents[m][k] = 1 - val['info'][k][m]
+    df[param_names[:-1]] = df.drop("result", axis=1).astype(np.float32)
     print(incumbents)
     table['global_min'] = dict()
     for m in metrics.keys():
@@ -116,10 +141,17 @@ if __name__ == "__main__":
             val=incumbents[m]["val_scores"],
             test=incumbents[m]["test_scores"]
         )
+    print("\nTable file updated with global minimas!")
     assert len(missing) == 0, "Incomplete collection: {} missing evaluations!\n" \
                               "Dumping missing indexes at {}".format(
         len(missing), dump_file(missing, args.path, task_id, space)
     )
-    with open(args.path, "wb") as f:
-        pickle.dump(table, f)
-    print("\nTable file updated with global minimas!")
+    # Dumping compressed files
+    output_path = os.path.join("/".join(args.path.split("/")[:-1]), str(task_id))
+    os.makedirs(output_path, exist_ok=True)
+    df.to_parquet(os.path.join(output_path, "{}_{}_data.parquet.gzip".format(space, task_id)))
+    with open(os.path.join(output_path, "{}_{}.json".format(space, task_id)), "w") as f:
+        json.dump(exp_args, f)
+    with open(os.path.join(output_path, "{}_{}_configs.pkl".format(space, task_id)), "wb") as f:
+        pickle.dump(config_spaces, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print("All files saved!")
