@@ -27,6 +27,6 @@ name=$1
 echo "TMPDIR: "$TMPDIR
 
 cp -r $wspace"/openml_splits/" $TMPDIR
-cp $wspace"/scheduler/"$name".json" $TMPDIR
+# cp $wspace"/scheduler/"$name".json" $TMPDIR
 
-bash $codedir/scripts/dask/deploy_workers.sh $nworkers $TMPDIR"/"$name".json" $wspace $id
+bash $codedir/scripts/dask/deploy_workers.sh $nworkers $wspace"scheduler/"$name".json" $wspace $id

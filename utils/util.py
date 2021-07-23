@@ -316,6 +316,13 @@ def arg_yaml_all_task(space, dest="nemo", exp_type="toy"):
     args.exp_name = exp_type
     for task_id in all_task_ids:
         args.task_id = task_id
+        # missing files have the format [model]_[task_id]_missing.txt, e.g.: svm_53_missing.txt
+        missing_path = args.missing.split("/")
+        missing_file = missing_path[-1].split("_")
+        missing_file[1] = str(args.task_id)
+        missing_file = "_".join(missing_file)
+        missing_path[-1] = missing_file
+        args.missing = "/".join(missing_path)
         filename = os.path.join("arguments", dest, exp_type, space, "args_{}.yaml".format(task_id))
         dump_yaml_args(dict(args), filename)
     return

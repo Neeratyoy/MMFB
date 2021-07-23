@@ -234,6 +234,12 @@ def input_arguments():
         type=int,
         help="Runs and computes the experiment from `restart_id` onwards"
     )
+    parser.add_argument(
+        "--missing",
+        default=None,
+        type=str,
+        help="File of missing evaluations"
+    )
     args = parser.parse_args()
     return args
 
@@ -379,6 +385,13 @@ if __name__ == "__main__":
             logger.info("Dask Client information: {}".format(client.client))
     logger.info("Executing with {} worker(s)".format(num_workers))
 
+    # Loading file of index of missing evaluations to collect only those evaluations
+    missing = []
+    if args.missing is not None and os.path.isfile(args.missing) and len(task_ids) == 1:
+        with open(args.missing, "r") as f:
+            missing = f.readlines()
+        missing = [int(id.strip()) for id in missing]
+
     start = time.time()
     total_combinations = len(task_ids) * len(grid_config) * len(grid_fidelity) * args.n_seeds
     for i, combination in enumerate(
@@ -386,6 +399,9 @@ if __name__ == "__main__":
     ):
         logger.info("{}/{}".format(i, total_combinations))
         logger.debug("Running for {:.2f} seconds".format(time.time() - start))
+        # if missing indexes exist and current index i is not a part of it, assume it is collected
+        if len(missing) and i not in missing:
+            continue
         if i < args.restart_id:
             logger.debug("Skipping and continuing evaluation..")
             continue
