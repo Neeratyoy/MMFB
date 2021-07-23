@@ -5,4 +5,4 @@ scheduler=$1
 export PYTHONPATH=$PWD:$PYTHONPATH
 export PYTHONPATH=$PWD"/../HPOBench/":$PYTHONPATH
 
-dask-scheduler --scheduler-file $scheduler
+dask-scheduler --scheduler-file $scheduler --port 0
