@@ -44,6 +44,7 @@ def dump_file(missing, path, task_id, space):
 
 
 def search_benchmark(entry, df):
+    # https://stackoverflow.com/questions/17071871/how-do-i-select-rows-from-a-dataframe-based-on-column-values
     mask = np.array([True] * df.shape[0])
     for i, param in enumerate(df.drop("result", axis=1).columns):
         mask *= df[param].values == entry[i]
@@ -55,14 +56,18 @@ def search_benchmark(entry, df):
     return result
 
 
+def json_compatible_dict(data):
+    for k, v in data.items():
+        if hasattr(v, "dtype"):
+            if "int" in v.dtype.name:
+                data[k] = int(v)
+            elif "float" in v.dtype.name:
+                data[k] = float(v)
+    return data
+
+
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument(
-        "--iters",
-        default=10,
-        type=int,
-        help="number of random samples to draw"
-    )
     parser.add_argument(
         "--path",
         default=None,
@@ -151,7 +156,7 @@ if __name__ == "__main__":
     os.makedirs(output_path, exist_ok=True)
     df.to_parquet(os.path.join(output_path, "{}_{}_data.parquet.gzip".format(space, task_id)))
     with open(os.path.join(output_path, "{}_{}.json".format(space, task_id)), "w") as f:
-        json.dump(exp_args, f)
+        json.dump(json_compatible_dict(exp_args), f)
     with open(os.path.join(output_path, "{}_{}_configs.pkl".format(space, task_id)), "wb") as f:
         pickle.dump(config_spaces, f, protocol=pickle.HIGHEST_PROTOCOL)
     print("All files saved!")
