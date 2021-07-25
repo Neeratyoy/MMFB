@@ -25,6 +25,9 @@ echo "Loading args from "$config
 
 source $HOME/miniconda3/bin/activate mmfb
 
+# important for Dask to not fail on large cluster setups
+source $codedir/scripts/nemo/config.sh
+
 # setting path variables to allow relative imports to work
 export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH

@@ -6,13 +6,13 @@ scheduler=$2
 localdir=$3
 id=$4
 
+codedir=$HOME'/Thesis/code/MMFB'
+
 export PYTHONPATH=$PWD:$PYTHONPATH
 export PYTHONPATH=$PWD"/../HPOBench/":$PYTHONPATH
 
 # important for Dask to not fail on large cluster setups
-export DASK_DISTRIBUTED__SCHEDULER__ALLOWED_FAILURES=10
-export DASK_DISTRIBUTED__COMM__TIMEOUTS__CONNECT=60
-export DASK_DISTRIBUTED__COMM__RETRY__COUNT=5
+source $codedir/scripts/nemo/config.sh
 
 for ((i=0; i<$nworkers; i++)); do
     nohup `dask-worker --scheduler-file $scheduler \
