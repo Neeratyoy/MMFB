@@ -355,7 +355,9 @@ class DaskHelper:
             )
         self.futures = []
         self.shared_data = None
-        self.worker_list = None
+        self.worker_list = self._get_worker_list()
+        # adds only this many workers at a time when new workers available
+        self._add_worker_batch_lim = 3
 
     def _get_n_workers(self):
         self.n_workers = len(self.client.ncores())
@@ -400,7 +402,7 @@ class DaskHelper:
             return False
         return True
 
-    def is_worker_available(self):
+    def is_worker_available(self) -> List:
         """ Checks if at least one worker is available to run a job
         """
         if self.n_workers == 1:
@@ -415,16 +417,26 @@ class DaskHelper:
             return []  #False
         # Given multiple different benchmark processes can share the same pool of workers, to
         # have a better estimate of queued jobs, need to retrieve information from all workers
-        # if hasattr(self.client, "_scheduler_identity") and \
-        #         "workers" in self.client._scheduler_identity:
         workers = self.client._scheduler_identity["workers"]
-        # selecting a random worker as placeholder
-        available = [np.random.choice(list(self.client._scheduler_identity["workers"].keys()))]
+        if set(self.worker_list) - set(workers.keys()):
+            # worker_list has more workers than currently found -> missing workers -> update list
+            print("Workers missing! Updating list...")
+            self.worker_list = list(workers.keys())
         worker_status = list(
-            map(lambda k: self._check_a_worker(workers[k]['metrics']), list(workers.keys()))
+            map(lambda k: self._check_a_worker(workers[k]['metrics']), self.worker_list)
         )
         # If at least one of the available worker(s) are free, a True signal is returned
         available = np.array(list(workers.keys()))[np.where(worker_status)[0]].tolist()
+        # Update worker list when more workers available than registered
+        if set(workers.keys()) - set(self.worker_list):
+            # more workers found than in the list recorded
+            # for stability with scheduler comms, need to add workers in batches and not together
+            # heuristic: can increase worker count only by the batch limit defined
+            new_workers = list(set(workers.keys()) - set(self.worker_list))
+            batch_limit = np.min((self._add_worker_batch_lim, len(new_workers)))
+            print("{} new worker(s) found!".format(batch_limit))
+            new_workers = np.random.choice(new_workers, size=batch_limit, replace=False).tolist()
+            self.worker_list = self.worker_list + new_workers
         return available
 
     def fetch_futures(self, retries=1, wait_time=0.05):
