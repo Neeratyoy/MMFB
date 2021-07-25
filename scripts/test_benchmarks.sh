@@ -1,13 +1,16 @@
 #! /bin/bash
 
-declare -a tids=(10101 53 146818) # 146821 9952 146822 31 3917 168912 3)
+declare -a tids=(10101 53 146818)
 
-model="svm"
+model=$1
 fidelity=1
+
 path="tmp_dump/test/"$model"/"$fidelity"/benchmark/"
+path="nemo_dump/"$model"/"$fidelity"/benchmark/"
+path="/work/ws/nemo/fr_nm217-hpobench-0/full/"$model$/$fidelity"/benchmark/"
 
 for tid in "${tids[@]}"
 do
     echo "Task ID: "$tid
-    python utils/test_benchmark.py --path $path"task_"$tid"_new.pkl"
+    python utils/test_benchmark_compress.py --path $path"task_"$tid"_new.pkl"
 done

@@ -357,7 +357,7 @@ class DaskHelper:
         self.shared_data = None
         self.worker_list = self._get_worker_list()
         # adds only this many workers at a time when new workers available
-        self._add_worker_batch_lim = 3
+        self._add_worker_batch_lim = 20
 
     def _get_n_workers(self):
         self.n_workers = len(self.client.ncores())
