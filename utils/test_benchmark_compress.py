@@ -137,25 +137,30 @@ if __name__ == "__main__":
                 if 1 - val['info'][k][m] < v:  # loss = 1 - accuracy
                     incumbents[m][k] = 1 - val['info'][k][m]
     df[param_names[:-1]] = df.drop("result", axis=1).astype(np.float32)
+    df["seed"] = df["seed"].astype(int)
     print(incumbents)
-    table['global_min'] = dict()
-    for m in metrics.keys():
-        table['global_min'][m] = dict(
-            train=incumbents[m]["train_scores"],
-            val=incumbents[m]["val_scores"],
-            test=incumbents[m]["test_scores"]
-        )
-    print("\nTable file updated with global minimas!")
+    for k, v in incumbents.items():
+        v["train"] = v["train_scores"]
+        v["val"] = v["val_scores"]
+        v["test"] = v["test_scores"]
+        v.pop("train_scores")
+        v.pop("val_scores")
+        v.pop("test_scores")
+        incumbents[k] = v
+
     assert len(missing) == 0, "Incomplete collection: {} missing evaluations!\n" \
                               "Dumping missing indexes at {}".format(
         len(missing), dump_file(missing, args.path, task_id, space)
     )
-    # Dumping compressed files
+    # Dumping compressed files and other metadata
     output_path = os.path.join("/".join(args.path.split("/")[:-1]), str(task_id))
     os.makedirs(output_path, exist_ok=True)
     df.to_parquet(os.path.join(output_path, "{}_{}_data.parquet.gzip".format(space, task_id)))
+    print("\nCompressed table saved!")
+    exp_args["global_min"] = incumbents
     with open(os.path.join(output_path, "{}_{}.json".format(space, task_id)), "w") as f:
         json.dump(json_compatible_dict(exp_args), f)
+    print("Updated with global minimas!")
     with open(os.path.join(output_path, "{}_{}_configs.pkl".format(space, task_id)), "wb") as f:
         pickle.dump(config_spaces, f, protocol=pickle.HIGHEST_PROTOCOL)
     print("All files saved!")

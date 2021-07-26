@@ -47,7 +47,19 @@ def input_arguments():
         "--path",
         default=None,
         type=str,
-        help="the complete filepath to the tabular data file"
+        help="the filepath to the tabular data files"
+    )
+    parser.add_argument(
+        "--model",
+        default="svm",
+        type=str,
+        help="the model space for the hyperparameters"
+    )
+    parser.add_argument(
+        "--task_id",
+        default=10101,
+        type=int,
+        help="the task ID to load"
     )
     parser.add_argument(
         "--seed",
@@ -94,7 +106,9 @@ if __name__ == "__main__":
     args = input_arguments()
     print(os.environ["PYTHONPATH"])
 
-    benchmark = TabularBenchmark(table_path=args.path, seed=args.seed)
+    benchmark = TabularBenchmark(
+        path=args.path, model=args.model, task_id=args.task_id, seed=args.seed
+    )
     task_id = benchmark.exp_args['task_id']
     space = benchmark.exp_args['space']
     max_fidelity = benchmark.get_max_fidelity()
@@ -110,7 +124,7 @@ if __name__ == "__main__":
     dehb = DEHB(
         f=target_function, cs=benchmark.x_cs,
         min_budget=min_budget, max_budget=max_budget, eta=3,
-        n_workers=1, output_path="dehb_dump"
+        n_workers=1, output_path="./dehb_dump"
     )
     trace, costs, full_trace = dehb.run(
         fevals=args.fevals, verbose=args.verbose, save_history=False, save_intermediate=False,
