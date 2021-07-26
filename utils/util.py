@@ -408,10 +408,7 @@ class DaskHelper:
         if self.n_workers == 1:
             # in the synchronous case, one worker is always available
             return True
-        # n_workers = self._get_n_workers()
-        workers = self.client._scheduler_identity["workers"]
-        n_workers = len(workers)
-        self.worker_list = list(workers.keys())
+        n_workers = self._get_n_workers()
         # `self.futures` contains only the list of futures submitted by the main process that
         # instantiated this class, which is adequate to check if workers available when workers
         # are exclusive available to only this process
@@ -420,10 +417,13 @@ class DaskHelper:
             return []  #False
         # Given multiple different benchmark processes can share the same pool of workers, to
         # have a better estimate of queued jobs, need to retrieve information from all workers
-        if set(self.worker_list) - set(workers.keys()):
-            # worker_list has more workers than currently found -> missing workers -> update list
-            print("Workers missing! Updating list...")
-            self.worker_list = list(workers.keys())
+        # workers = self.client._scheduler_identity["workers"]
+        # n_workers = len(workers)
+        # self.worker_list = list(workers.keys())
+        # if set(self.worker_list) - set(workers.keys()):
+        #     # worker_list has more workers than currently found -> missing workers -> update list
+        #     print("Workers missing! Updating list...")
+        #     self.worker_list = list(workers.keys())
         # new_workers = list(set(workers.keys()) - set(self.worker_list))
         # # Update worker list when more workers available than registered
         # if new_workers:
@@ -435,11 +435,15 @@ class DaskHelper:
         #     new_workers = np.random.choice(new_workers, size=batch_limit, replace=False).tolist()
         #     self.worker_list = self.worker_list + new_workers
         # Gets the status of each worker in the current worker_list
-        worker_status = list(
-            map(lambda k: self._check_a_worker(workers[k]['metrics']), self.worker_list)
-        )
-        # If at least one of the available worker(s) are free, a True signal is returned
-        available = np.array(self.worker_list)[np.where(worker_status)[0]].tolist()
+        if hasattr(self.client, "_scheduler_identity") and "workers" in self.client._scheduler_identity:
+            workers = self.client._scheduler_identity["workers"]
+            worker_status = list(
+                map(lambda k: self._check_a_worker(workers[k]['metrics']), self.worker_list)
+            )
+            # If at least one of the available worker(s) are free, a True signal is returned
+            available = np.array(self.worker_list)[np.where(worker_status)[0]].tolist()
+        else:
+            available = list(self.client.ncores().keys())
         np.random.shuffle(available)
         return available
 
