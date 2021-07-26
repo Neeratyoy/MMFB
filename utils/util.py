@@ -437,6 +437,7 @@ class DaskHelper:
         # Gets the status of each worker in the current worker_list
         if hasattr(self.client, "_scheduler_identity") and "workers" in self.client._scheduler_identity:
             workers = self.client._scheduler_identity["workers"]
+            self.worker_list = list(workers.keys())
             worker_status = list(
                 map(lambda k: self._check_a_worker(workers[k]['metrics']), self.worker_list)
             )
