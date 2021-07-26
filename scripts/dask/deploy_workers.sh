@@ -22,4 +22,6 @@ for ((i=0; i<$nworkers; i++)); do
     sleep 3;
 done
 
+# not sure if background jobs in a remote cluster can be killed if parent is killed
+# sleep allows this parent job to be alive
 sleep 4d
