@@ -437,7 +437,8 @@ class DaskHelper:
             map(lambda k: self._check_a_worker(workers[k]['metrics']), self.worker_list)
         )
         # If at least one of the available worker(s) are free, a True signal is returned
-        available = np.array(list(workers.keys()))[np.where(worker_status)[0]].tolist()
+        available = np.array(self.worker_list)[np.where(worker_status)[0]].tolist()
+        np.random.shuffle(available)
         return available
 
     def fetch_futures(self, retries=1, wait_time=0.05):
