@@ -422,11 +422,6 @@ class DaskHelper:
             # worker_list has more workers than currently found -> missing workers -> update list
             print("Workers missing! Updating list...")
             self.worker_list = list(workers.keys())
-        worker_status = list(
-            map(lambda k: self._check_a_worker(workers[k]['metrics']), self.worker_list)
-        )
-        # If at least one of the available worker(s) are free, a True signal is returned
-        available = np.array(list(workers.keys()))[np.where(worker_status)[0]].tolist()
         # Update worker list when more workers available than registered
         if set(workers.keys()) - set(self.worker_list):
             # more workers found than in the list recorded
@@ -437,6 +432,12 @@ class DaskHelper:
             print("{} new worker(s) found!".format(batch_limit))
             new_workers = np.random.choice(new_workers, size=batch_limit, replace=False).tolist()
             self.worker_list = self.worker_list + new_workers
+        # Gets the status of each worker in the current worker_list
+        worker_status = list(
+            map(lambda k: self._check_a_worker(workers[k]['metrics']), self.worker_list)
+        )
+        # If at least one of the available worker(s) are free, a True signal is returned
+        available = np.array(list(workers.keys()))[np.where(worker_status)[0]].tolist()
         return available
 
     def fetch_futures(self, retries=1, wait_time=0.05):
