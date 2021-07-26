@@ -34,7 +34,7 @@ def query(table, config, fidelity, seed=None):
 
 
 def dump_file(missing, path, task_id, space):
-    output_path = path.split("/")[:-1]
+    output_path = path[:len(path) - path[::-1].find("/")]
     output_path.append("{}_{}_missing.txt".format(space, task_id))
     output_path = os.path.join(*output_path)
     missing = [str(ids) for ids in missing]
