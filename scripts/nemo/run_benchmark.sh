@@ -18,4 +18,8 @@ echo "Running "$exp" experiment on "$space" for task ID "$taskid
 export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
+# important to record reliable benchmark costs
+export MKL_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+
 bash $codedir/scripts/nemo/run_tabular.sh $space $exp $taskid

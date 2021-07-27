@@ -193,6 +193,7 @@ def get_parameter_grid(
             else:
                 grid = np.linspace(hp.lower, hp.upper, grid_step_size, dtype=np.float32)
             grid = grid.astype(int) if isinstance(hp, CS.UniformIntegerHyperparameter) else grid
+            grid = np.unique(grid).tolist()
             param_ranges.append(grid)
     full_grid = itertools.product(*param_ranges)
     if not convert_to_configspace:
