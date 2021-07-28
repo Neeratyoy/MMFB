@@ -432,7 +432,8 @@ if __name__ == "__main__":
                 time.sleep(0.05)  # 50 milliseconds
                 break
             else:
-                client.fetch_futures(retries=2, wait_time=0.1)  # 100 milliseconds
+                time.sleep(0.1)  # wait for 100 milliseconds
+                # client.fetch_futures(retries=2, wait_time=0.1)  # 100 milliseconds
     if num_workers > 1 and client.is_worker_alive():
         logger.info("Waiting for pending workers...")
         while num_workers > 1 and client.is_worker_alive():
