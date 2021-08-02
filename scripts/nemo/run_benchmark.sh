@@ -19,7 +19,6 @@ export PYTHONPATH=$codedir:$PYTHONPATH
 export PYTHONPATH=$codedir"/../HPOBench/":$PYTHONPATH
 
 # important to record reliable benchmark costs
-export MKL_NUM_THREADS=1
-export OMP_NUM_THREADS=1
+source $codedir/scripts/nemo/config.sh
 
 bash $codedir/scripts/nemo/run_tabular.sh $space $exp $taskid

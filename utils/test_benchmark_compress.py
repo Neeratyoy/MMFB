@@ -7,14 +7,11 @@ import itertools
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
+from ConfigSpace.read_and_write import json as json_cs
 
 from hpobench.benchmarks.ml.ml_benchmark_template import metrics
-from hpobench.benchmarks.ml.svm_benchmark import SVMBenchmark
-from hpobench.benchmarks.ml.histgb_benchmark import HistGBBenchmark
-from hpobench.benchmarks.ml.rf_benchmark import RandomForestBenchmark
 
-from run_benchmark_dask import param_space_dict
-from utils.util import get_discrete_configspace, load_yaml_args
+from utils.util import get_discrete_configspace
 
 
 def query(table, config, fidelity, seed=None):
@@ -86,7 +83,9 @@ if __name__ == "__main__":
     with open(args.path, "rb") as f:
         table = pickle.load(f)
 
+    metadata = dict()
     exp_args = table['exp_args']
+    metadata["exp_args"] = exp_args
     config_spaces = table['config_spaces']
     x = config_spaces['x']
     x_discrete = get_discrete_configspace(x, exp_args['x_grid_size'])
@@ -157,10 +156,18 @@ if __name__ == "__main__":
     os.makedirs(output_path, exist_ok=True)
     df.to_parquet(os.path.join(output_path, "{}_{}_data.parquet.gzip".format(space, task_id)))
     print("\nCompressed table saved!")
-    exp_args["global_min"] = incumbents
-    with open(os.path.join(output_path, "{}_{}.json".format(space, task_id)), "w") as f:
-        json.dump(json_compatible_dict(exp_args), f)
+    metadata["global_min"] = incumbents
+    # Converting discrete config space values to float: np.float32 not JSON serializable
+    for hp in config_spaces["x_discrete"].get_hyperparameters():
+        hp.default_value = float(hp.default_value)
+        hp.sequence = tuple(np.array(hp.sequence).astype(float))
+    for hp in config_spaces["z_discrete"].get_hyperparameters():
+        hp.default_value = float(hp.default_value)
+        hp.sequence = tuple(np.array(hp.sequence).astype(float))
+    for k, _space in config_spaces.items():
+        config_spaces[k] = json_cs.write(_space)
+    metadata["config_spaces"] = config_spaces
+    with open(os.path.join(output_path, "{}_{}_metadata.json".format(space, task_id)), "w") as f:
+        json.dump(json_compatible_dict(metadata), f)
     print("Updated with global minimas!")
-    with open(os.path.join(output_path, "{}_{}_configs.pkl".format(space, task_id)), "wb") as f:
-        pickle.dump(config_spaces, f, protocol=pickle.HIGHEST_PROTOCOL)
     print("All files saved!")

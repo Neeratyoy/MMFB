@@ -14,7 +14,7 @@ echo "Loading args from "$config
 
 source $HOME/miniconda3/bin/activate mmfb
 
-# important for Dask to not fail on large cluster setups
+# important for Dask to not fail on large cluster setups and record reliable benchmark costs
 source $codedir/scripts/nemo/config.sh
 
 # setting path variables to allow relative imports to work
