@@ -9,7 +9,7 @@ data_path: "/work/ws/nemo/fr_nm217-hpobench-0/openml_splits"
 output_path: "/work/ws/nemo/fr_nm217-hpobench-0/"
 n_workers: null
 task_id: null
-scheduler_file: "/work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler.json"
+scheduler_file: "/work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler_xgb.json"
 seed: 1234
 exp_name: null
 restart_id: 0

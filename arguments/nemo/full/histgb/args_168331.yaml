@@ -8,7 +8,7 @@ n_tasks: null
 n_workers: null
 output_path: /work/ws/nemo/fr_nm217-hpobench-0/
 restart_id: 0
-scheduler_file: /work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler.json
+scheduler_file: /work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler_histgb.json
 seed: 1234
 space: histgb
 task_id: 168331
