@@ -433,11 +433,11 @@ if __name__ == "__main__":
                 break
             else:
                 time.sleep(0.1)  # wait for 100 milliseconds
-                # client.fetch_futures(retries=2, wait_time=0.1)  # 100 milliseconds
-    # if num_workers > 1 and client.is_worker_alive():
-    #     logger.info("Waiting for pending workers...")
-    #     while num_workers > 1 and client.is_worker_alive():
-    #         client.fetch_futures(retries=2, wait_time=0.1)  # 100 milliseconds
+                client.fetch_futures(retries=1, wait_time=0.1)  # 100 milliseconds
+    if num_workers > 1 and client.is_worker_alive():
+        logger.info("Waiting for pending workers...")
+        while num_workers > 1 and client.is_worker_alive():
+            client.fetch_futures(retries=1, wait_time=5)  # 5 seconds
     end = time.time()
 
     logger.info(

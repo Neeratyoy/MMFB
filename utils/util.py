@@ -383,11 +383,11 @@ class DaskHelper:
 
     def submit_job(self, func, x, workers):
         if self.shared_data is not None:
-            self.client.submit(func, x, self.shared_data, workers=workers)
-            # self.futures.append(self.client.submit(func, x, self.shared_data, workers=workers))
+            # self.client.submit(func, x, self.shared_data, workers=workers)
+            self.futures.append(self.client.submit(func, x, self.shared_data, workers=workers))
         else:
-            self.client.submit(func, x, workers=workers)
-            # self.futures.append(self.client.submit(func, x, workers=workers))
+            # self.client.submit(func, x, workers=workers)
+            self.futures.append(self.client.submit(func, x, workers=workers))
 
     def _check_a_worker(self, worker_metrics):
         """ Checks if a worker can take a new job or not
@@ -415,9 +415,9 @@ class DaskHelper:
         # `self.futures` contains only the list of futures submitted by the main process that
         # instantiated this class, which is adequate to check if workers available when workers
         # are exclusive available to only this process
-        # if len(self.futures) >= n_workers:
-        #     # pause/wait if active worker count greater allocated workers
-        #     return []  #False
+        if len(self.futures) >= n_workers:
+            # pause/wait if active worker count greater allocated workers
+            return []  #False
         # Given multiple different benchmark processes can share the same pool of workers, to
         # have a better estimate of queued jobs, need to retrieve information from all workers
         # workers = self.client._scheduler_identity["workers"]
