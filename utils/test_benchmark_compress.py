@@ -7,6 +7,7 @@ import itertools
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
+import ConfigSpace as CS
 from ConfigSpace.read_and_write import json as json_cs
 
 from hpobench.benchmarks.ml.ml_benchmark_template import metrics
@@ -162,8 +163,12 @@ if __name__ == "__main__":
         hp.default_value = float(hp.default_value)
         hp.sequence = tuple(np.array(hp.sequence).astype(float))
     for hp in config_spaces["z_discrete"].get_hyperparameters():
-        hp.default_value = float(hp.default_value)
-        hp.sequence = tuple(np.array(hp.sequence).astype(float))
+        if isinstance(hp.default_value, (np.float16, np.float32, np.float64)):
+            hp.default_value = float(hp.default_value)
+            hp.sequence = tuple(float(val) for val in hp.sequence)
+        else:
+            hp.default_value = int(hp.default_value)
+            hp.sequence = tuple(int(val) for val in hp.sequence)
     for k, _space in config_spaces.items():
         config_spaces[k] = json_cs.write(_space)
     metadata["config_spaces"] = config_spaces
