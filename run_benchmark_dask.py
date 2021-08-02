@@ -26,7 +26,7 @@ param_space_dict = dict(
     nn=NNBenchmark,
     svm=SVMBenchmark,
     histgb=HistGBBenchmark,
-    xgboost=XGBoostBenchmark,
+    xgb=XGBoostBenchmark,
 )
 
 
