@@ -13,4 +13,4 @@ scheduler_file: "/work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler_nn.json"
 seed: 1234
 exp_name: null
 restart_id: 0
-missing: "/work/ws/nemo/fr_nm217-hpobench-0/full/svm/1/benchmark/nn_10101_missing.txt"
+missing: "/work/ws/nemo/fr_nm217-hpobench-0/full/nn/1/benchmark/nn_10101_missing.txt"

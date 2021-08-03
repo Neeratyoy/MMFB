@@ -13,4 +13,4 @@ scheduler_file: "/work/ws/nemo/fr_nm217-hpobench-0/scheduler/scheduler_histgb.js
 seed: 1234
 exp_name: null
 restart_id: 0
-missing: "/work/ws/nemo/fr_nm217-hpobench-0/full/svm/1/benchmark/histgb_10101_missing.txt"
+missing: "/work/ws/nemo/fr_nm217-hpobench-0/full/histgb/1/benchmark/histgb_10101_missing.txt"
