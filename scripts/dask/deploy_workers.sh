@@ -19,7 +19,7 @@ for ((i=0; i<$nworkers; i++)); do
         --no-nanny --nprocs 1 --nthreads 1 --name 'worker'$id'_'$i \
         --local-directory $localdir` --reconnect &
     echo 'Created worker'$i;
-    sleep 3;
+    sleep 15;
 done
 
 # not sure if background jobs in a remote cluster can be killed if parent is killed
