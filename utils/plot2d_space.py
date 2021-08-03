@@ -45,7 +45,8 @@ if __name__ == "__main__":
     x_cs = benchmark.x_cs
     z_cs = benchmark.z_cs
     param_list = []
-    for hp in benchmark.x_cs.get_hyperparameters():
+    for hp_name in np.sort(benchmark.x_cs.get_hyperparameter_names()):
+        hp = benchmark.x_cs.get_hyperparameter(str(hp_name))
         param_list.append(hp.sequence)
     x1 = []
     x2 = []
@@ -62,12 +63,15 @@ if __name__ == "__main__":
             fidelity[k] = v
         res = benchmark.objective_function(config, fidelity)
         y.append(res["function_value"])
-    x1 = np.apply_along_axis(np.log, 0, x1)
-    x2 = np.apply_along_axis(np.log, 0, x2)
+    x1 = np.apply_along_axis(np.log10, 0, x1)
+    x2 = np.apply_along_axis(np.log10, 0, x2)
     plt.clf()
     contour = plt.tricontourf(x1, x2, y, levels=12, cmap="RdBu_r")
     plt.colorbar(contour, label="loss")
     plt.title("{} on Task ID {}".format(args.space, args.task_id), size=15)
+    labels = np.sort(benchmark.x_cs.get_hyperparameter_names())
+    plt.xlabel(labels[0])
+    plt.ylabel(labels[1])
     plotname = os.path.join(args.output_path, "{}_{}.png".format(args.space, args.task_id))
     plt.savefig(plotname)
     print("Plot saved to: ", plotname)
