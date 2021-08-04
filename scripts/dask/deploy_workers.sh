@@ -17,7 +17,7 @@ source $codedir/scripts/nemo/config.sh
 for ((i=0; i<$nworkers; i++)); do
     nohup `dask-worker --scheduler-file $scheduler \
         --no-nanny --nprocs 1 --nthreads 1 --name 'worker'$id'_'$i \
-        --local-directory $localdir` --reconnect &
+        --local-directory $localdir --reconnect` &
     echo 'Created worker'$i;
     sleep 15;
 done
