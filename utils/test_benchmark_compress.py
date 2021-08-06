@@ -55,6 +55,9 @@ def search_benchmark(entry, df):
 
 def json_compatible_dict(data):
     for k, v in data.items():
+        if isinstance(v, dict):
+            v = json_compatible_dict(v)
+            data[k] = v
         if hasattr(v, "dtype"):
             if "int" in v.dtype.name:
                 data[k] = int(v)
