@@ -414,11 +414,12 @@ if __name__ == "__main__":
         combination.append(param_space)
         combination.append(lock)
         if num_workers == 1:
-            compute(return_dict(combination))  #, benchmarks)
+            compute(return_dict(combination))
             continue
         # for a combination selected, need to wait until it is submitted to a worker
         # client.submit_job() is an asynchronous call, followed by a break which allows the
         # next combination to be submitted if client.is_worker_available() is True
+        wait_count = 0
         while True:
             workers = client.is_worker_available()
             if workers:
@@ -432,8 +433,12 @@ if __name__ == "__main__":
                 time.sleep(0.05)  # 50 milliseconds
                 break
             else:
-                time.sleep(0.1)  # wait for 100 milliseconds
-                client.fetch_futures(retries=1, wait_time=0.05)  # 50 milliseconds
+                wait_count += 1
+                time.sleep(0.1)  # wait for 100 milliseconds before querying for futures
+                client.fetch_futures(retries=1, wait_time=0.0)
+            # if wait_count > 10:
+            #     client.update_n_workers()
+            #     client.update_n_workers()
     if num_workers > 1 and client.is_worker_alive():
         logger.info("Waiting for pending workers...")
         while num_workers > 1 and client.is_worker_alive():
