@@ -74,6 +74,12 @@ def input_arguments():
         type=str,
         help="full path to benchmark file"
     )
+    parser.add_argument(
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="prints every evaluation output"
+    )
     args = parser.parse_args()
     return args
 
@@ -134,7 +140,10 @@ if __name__ == "__main__":
         entry.append(val)
         _df = pd.DataFrame([entry], index=[count], columns=param_names)
         df = df.append(_df)
-        print(count, val, '\n')
+        if args.verbose:
+            print(count, val, '\n')
+        else:
+            print(count, end="\r")
         for m in metrics.keys():
             for k, v in incumbents[m].items():
                 if 1 - val['info'][k][m] < v:  # loss = 1 - accuracy
