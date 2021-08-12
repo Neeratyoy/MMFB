@@ -7,12 +7,15 @@ import itertools
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
-import ConfigSpace as CS
 from ConfigSpace.read_and_write import json as json_cs
+from joblib.parallel import Parallel, parallel_backend, delayed
 
 from hpobench.benchmarks.ml.ml_benchmark_template import metrics
 
 from utils.util import get_discrete_configspace
+
+
+splits = ["train", "val", "test"]
 
 
 def query(table, config, fidelity, seed=None):
@@ -66,6 +69,22 @@ def json_compatible_dict(data):
     return data
 
 
+def joblib_fn(count, entry, param_names):
+    key_path = entry
+    print(count, end="\r")
+    val = glom.glom(table['data'], glom.Path(*key_path), default=None)
+    if val is None:
+        return count
+    entry = [np.float32(e) for e in entry]
+    entry.append(val)
+    for m in metrics.keys():
+        for split in splits:
+            split_key = "{}_scores".format(split)
+            entry.append(1 - val['info'][split_key][m])  # loss = 1 - metric
+    _df = pd.DataFrame([entry], index=[count], columns=param_names)
+    return _df
+
+
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
@@ -79,6 +98,12 @@ def input_arguments():
         default=False,
         action="store_true",
         help="prints every evaluation output"
+    )
+    parser.add_argument(
+        "--n_jobs",
+        default=None,
+        type=int,
+        help="number of cpus to parallelize over"
     )
     args = parser.parse_args()
     return args
@@ -123,31 +148,37 @@ if __name__ == "__main__":
     param_list.append(seeds)
     param_names.append("seed")
     param_names.append("result")
-    df = pd.DataFrame([], columns=param_names)
+    # Important to record values to calculate global minimas efficiently
+    for m in metrics.keys():
+        for split in splits:
+            split_key = "{}_scores".format(split)
+            param_names.append("{}_{}".format(m, split_key))
+    # df = pd.DataFrame([], columns=param_names)
     count = 0
+    missing = []
+
+    with parallel_backend(backend="multiprocessing", n_jobs=args.n_jobs):
+        dfs = Parallel()(
+            delayed(joblib_fn)(
+                count, entry, param_names
+            ) for count, entry in enumerate(itertools.product(*param_list), start=1)
+        )
+    missing = [_df for _df in dfs if isinstance(_df, int)]
+    dfs = [_df for _df in dfs if isinstance(_df, pd.DataFrame)]
+
+    print("Total len: {}".format(len(missing) + len(dfs)))
+    print(len(list(itertools.product(*param_list))))
+
+    df = pd.concat(dfs).sort_index()
     incumbents = dict()
     for m in metrics.keys():
-        incumbents[m] = dict(train_scores=np.inf, val_scores=np.inf, test_scores=np.inf)
-    missing = []
-    for count, entry in enumerate(itertools.product(*param_list), start=1):
-        key_path = entry
-        # key_path = [np.float32(_key) for _key in key_path]
-        val = glom.glom(table['data'], glom.Path(*key_path), default=None)
-        if val is None:
-            missing.append(count)
-            continue
-        entry = [np.float32(e) for e in entry]
-        entry.append(val)
-        _df = pd.DataFrame([entry], index=[count], columns=param_names)
-        df = df.append(_df)
-        if args.verbose:
-            print(count, val, '\n')
-        else:
-            print(count, end="\r")
-        for m in metrics.keys():
-            for k, v in incumbents[m].items():
-                if 1 - val['info'][k][m] < v:  # loss = 1 - accuracy
-                    incumbents[m][k] = 1 - val['info'][k][m]
+        incumbents[m] = dict()
+        for split in splits:
+            split_key = "{}_scores".format(split)
+            colname = "{}_{}".format(m, split_key)
+            param_names.remove(colname)
+            incumbents[m][split_key] = df[colname].values.min()
+            df = df.drop(colname, axis=1)
     df[param_names[:-1]] = df.drop("result", axis=1).astype(np.float32)
     df["seed"] = df["seed"].astype(int)
     print(incumbents)

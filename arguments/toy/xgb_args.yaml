@@ -13,3 +13,4 @@ scheduler_file: null #"./tmp_dump/scheduler.json"
 seed: 1234
 exp_name: "test"
 restart_id: 0
+missing: ./tmp_dump/test/xgb/1/benchmark/xgb_10101_missing.txt
