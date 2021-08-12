@@ -94,12 +94,6 @@ def input_arguments():
         help="full path to benchmark file"
     )
     parser.add_argument(
-        "--verbose",
-        default=False,
-        action="store_true",
-        help="prints every evaluation output"
-    )
-    parser.add_argument(
         "--n_jobs",
         default=None,
         type=int,
@@ -165,9 +159,6 @@ if __name__ == "__main__":
         )
     missing = [_df for _df in dfs if isinstance(_df, int)]
     dfs = [_df for _df in dfs if isinstance(_df, pd.DataFrame)]
-
-    print("Total len: {}".format(len(missing) + len(dfs)))
-    print(len(list(itertools.product(*param_list))))
 
     df = pd.concat(dfs).sort_index()
     incumbents = dict()
