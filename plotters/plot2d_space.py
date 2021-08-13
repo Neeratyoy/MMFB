@@ -72,6 +72,6 @@ if __name__ == "__main__":
     labels = np.sort(benchmark.x_cs.get_hyperparameter_names())
     plt.xlabel(labels[0])
     plt.ylabel(labels[1])
-    plotname = os.path.join(args.output_path, "{}_{}.png".format(args.space, args.task_id))
+    plotname = os.path.join(args.output_path, "{}_{}.pdf".format(args.space, args.task_id))
     plt.savefig(plotname)
     print("Plot saved to: ", plotname)
