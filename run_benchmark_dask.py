@@ -22,11 +22,11 @@ _logger_props = {
 
 param_space_dict = dict(
     lr={0: LRBenchmark, 1: LRBenchmarkMF, 2: LRBenchmarkBB},
-    rf=RandomForestBenchmark,
-    nn=NNBenchmark,
-    svm=SVMBenchmark,
-    histgb=HistGBBenchmark,
-    xgb=XGBoostBenchmark,
+    rf={0: RandomForestBenchmark, 1: RandomForestBenchmarkMF, 2: RandomForestBenchmarkBB},
+    nn={0: NNBenchmark, 1: NNBenchmarkMF, 2: NNBenchmarkBB},
+    svm={0: SVMBenchmark, 1: SVMBenchmarkMF, 2: SVMBenchmarkBB},
+    xgb={0: XGBoostBenchmark, 1: XGBoostBenchmarkMF, 2: XGBoostBenchmarkBB},
+    histgb={0: HistGBBenchmark, 1: HistGBBenchmarkMF, 2: HistGBBenchmarkBB},
 )
 
 
