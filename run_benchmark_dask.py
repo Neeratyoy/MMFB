@@ -21,7 +21,7 @@ _logger_props = {
 }
 
 param_space_dict = dict(
-    lr=LRBenchmark,
+    lr={0: LRBenchmark, 1: LRBenchmarkMF, 2: LRBenchmarkBB},
     rf=RandomForestBenchmark,
     nn=NNBenchmark,
     svm=SVMBenchmark,
@@ -98,7 +98,6 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     benchmark = model_space(
         task_id=task_id,
         seed=seed,
-        fidelity_choice=fidelity_choice,
         data_path=data_path
     )
     if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
@@ -258,7 +257,7 @@ if __name__ == "__main__":
         args.output_path = os.path.join(args.output_path, args.exp_name)
 
     # Choosing parameter space
-    param_space = param_space_dict[args.space]
+    param_space = param_space_dict[args.space][args.fidelity_choice]
 
     # Task input check
     # automl_benchmark = openml.study.get_suite(218)
@@ -314,28 +313,10 @@ if __name__ == "__main__":
     seeds = np.random.randint(1, 10000, size=args.n_seeds)
     logger.info("Seeds selected {}".format(seeds))
 
-    # Loading benchmarks
-    # benchmarks = dict()
-    # for task_id in task_ids:
-    #     benchmarks[task_id] = dict()
-    #     for seed in seeds:
-    #         logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
-    #         benchmarks[task_id][seed] = param_space(
-    #             task_id=task_id,
-    #             seed=seed,
-    #             fidelity_choice=args.fidelity_choice,
-    #             data_path=args.data_path
-    #         )
-    #         benchmarks[task_id][seed].load_data_from_openml()
-    #         break
-    # logger.info("Total size of {} benchmark objects in memory: {:.5f} MB".format(
-    #     len(task_ids) * len(seeds), obj_size(benchmarks)
-    # ))
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = param_space(
         task_id=task_ids[0],
         seed=seeds[0],
-        fidelity_choice=args.fidelity_choice,
         data_path=args.data_path
     )
 
