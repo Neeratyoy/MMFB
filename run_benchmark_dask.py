@@ -7,7 +7,7 @@ from typing import Dict
 from loguru import logger
 from distributed import Lock
 
-from hpobench.benchmarks.ml import *
+from hpobench.benchmarks.ml_mmfb import *
 
 from utils.util import *
 from utils.util import all_task_ids_by_in_mem_size, read_openml_splits
@@ -97,7 +97,8 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     # benchmark = benchmarks[task_id][seed]
     benchmark = model_space(
         task_id=task_id,
-        seed=seed,
+        # seed=seed,
+        rng=seed,
         data_path=data_path
     )
     if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
@@ -316,28 +317,29 @@ if __name__ == "__main__":
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = param_space(
         task_id=task_ids[0],
-        seed=seeds[0],
+        # seed=seeds[0],
+        rng=seeds[0],
         data_path=args.data_path
     )
 
     # Saving a copy of the ConfigSpaces used for this run
     with open(os.path.join(base_path, "param_space.pkl"), "wb") as f:
-        pickle.dump(benchmark.x_cs, f)  # hyper-parameter configuration space
+        pickle.dump(benchmark.configuration_space, f)  # hyper-parameter configuration space
     with open(os.path.join(path, "fidelity_space.pkl"), "wb") as f:
-        pickle.dump(benchmark.z_cs, f)  # fidelity configuration space
+        pickle.dump(benchmark.fidelity_space, f)  # fidelity configuration space
 
     # Retrieving observation space and populating grid
-    x_cs = benchmark.x_cs
+    configuration_space = benchmark.configuration_space
     logger.info("Populating grid for observation space...")
-    grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=False)
+    grid_config = get_parameter_grid(configuration_space, args.x_grid_size, convert_to_configspace=False)
     logger.info("{} unique observations generated".format(len(grid_config)))
     logger.debug("Observation space grid size: {:.2f} MB".format(obj_size(grid_config)))
 
     # Retrieving fidelity spaces and populating grid
-    z_cs = benchmark.z_cs
+    fidelity_space = benchmark.fidelity_space
     logger.info("Populating grid for fidelity space...")
     grid_fidelity = get_fidelity_grid(
-        z_cs, args.z_grid_size, convert_to_configspace=False, include_sh_budgets=args.include_SH
+        fidelity_space, args.z_grid_size, convert_to_configspace=False, include_sh_budgets=args.include_SH
     )
     logger.info("{} unique fidelity configurations generated".format(len(grid_fidelity)))
     logger.debug("Fidelity space grid size: {:.2f} MB".format(obj_size(grid_fidelity)))
@@ -387,8 +389,8 @@ if __name__ == "__main__":
             logger.debug("Skipping and continuing evaluation..")
             continue
         combination = list(combination)
-        combination[1] = map_to_config(x_cs, combination[1])
-        combination[2] = map_to_config(z_cs, combination[2])
+        combination[1] = map_to_config(configuration_space, combination[1])
+        combination[2] = map_to_config(fidelity_space, combination[2])
         combination.append(args.data_path)
         combination.append(args.fidelity_choice)
         combination.append(i)

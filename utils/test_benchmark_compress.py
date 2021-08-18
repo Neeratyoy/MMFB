@@ -10,7 +10,7 @@ from collections import OrderedDict
 from ConfigSpace.read_and_write import json as json_cs
 from joblib.parallel import Parallel, parallel_backend, delayed
 
-from hpobench.benchmarks.ml.ml_benchmark_template import metrics
+from hpobench.dependencies.ml_mmfb.ml_benchmark_template import metrics
 
 from utils.util import get_discrete_configspace
 
