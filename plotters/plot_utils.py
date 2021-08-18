@@ -133,7 +133,7 @@ def calc_area_under_curve(vals, width):
 
 def rank_incumbent_across_fidelities(model, tids, path):
     """ Plot to show how the full budget best config is not the best in lower fidelities """
-    aac_list = []
+    auc_list = []
     for tid in np.sort(tids):
         print(tid, end='\r')
         benchmark, val, _ = load_benchmark(model, tid)
@@ -158,16 +158,16 @@ def rank_incumbent_across_fidelities(model, tids, path):
                     _val = [np.float32(res["function_value"]) for res in table_per_fid[f].result]
                     temp.append(rankdata(_val)[min_idx])
                 ranks[seed].append(temp)
-            ranks[seed] = np.array(ranks[seed]).median(axis=0)
+            ranks[seed] = np.median(ranks[seed], axis=0)
         x = range(1, len(fidelities) + 1)
         df = pd.DataFrame(ranks)
         size = table_per_fid[full_budget].shape[0]
         m = (size - df.transpose().median().values) / size
         max_area = 1 * (len(fidelities) - 1)
-        auc = calc_area_under_curve(m, 1)
+        auc = calc_area_under_curve(m, 1) / max_area
         # area above curve (AAC)
-        aac = 1 - auc / max_area
-        aac_list.append(aac)
+        # aac = 1 - auc / max_area
+        auc_list.append(auc)
         plt.clf()
         plt.plot(x, m, color="blue")
         plt.fill_between(x, 0, m, alpha=0.3, color="blue")
@@ -178,12 +178,16 @@ def rank_incumbent_across_fidelities(model, tids, path):
         plt.ylim(0, 1.01)
         plt.ylabel("%-tile rank of best configuration")
         plt.xlabel("fidelity values")
-        plt.title("Rank of best config across fidelities for {} on Task ID {}".format(model, tid))
-        plt.text(x=x[-2], y=0.60, s="AAC:\n{:.4f}".format(aac), fontdict={"fontsize": 20})
-        plt.savefig(os.path.join(path, "{}_{}.png".format(model, tid)))
+        plt.title("Rank across fidelities for {} on Task ID {}".format(model, tid))
+        plt.text(x=x[-2], y=0.60, s="AUC:\n{:.4f}".format(auc), fontdict={"fontsize": 20})
+        if tid in [168911, 168910, 9952, 168335, 168331, 9977]:
+            plt.savefig(os.path.join(path, "{}_{}.pdf".format(model, tid)), bbox_inches="tight")
+        else:
+            plt.savefig(os.path.join(path, "{}_{}.png".format(model, tid)), bbox_inches="tight")
     plt.clf()
-    plt.boxplot(aac_list)
-    plt.savefig(os.path.join(path, "{}.pdf".format(model)))
+    plt.boxplot(auc_list)
+    plt.title("AUC distribution across datasets for {}".format(model))
+    plt.savefig(os.path.join(path, "{}.pdf".format(model)), bbox_inches="tight")
 
 
 def cost_density_plot(table, model, task_id):
@@ -245,7 +249,8 @@ def full_space_fidelity_correlation(tids, fid_name, model, corr_type="kendall"):
     # generate pairwise correlation score for every lower fidelity with max budget for all datasets
     for i in range(len(fidelities) - 1):
         f1, f2 = fidelities[i], fidelities[-1]
-        key = "{:.2f}_{:.2f}".format(f1, f2)
+        # key = "{:.2f}_{:.2f}".format(f1, f2)
+        key = f1
         corr_df[key] = []
         for k, v in model_space.items():
             corr_df[key].append(v[f1][f2])
@@ -259,16 +264,32 @@ def line_box_corr_plot(plt, tids, fid_name, model, path, corr_type="kendall"):
     plt.clf()
     plt.plot(range(1, df.shape[1]+1), df.mean().values)
     plt.boxplot(df.values)
-    plt.xticks(range(1, df.shape[1]+1), df.columns)
+    plt.xticks(range(1, df.shape[1]+1), df.columns)  #, rotation=30)
     plt.title("{} correlation of fidelities to full budget for {}".format(corr_type, model))
-    plt.savefig(os.path.join(path, "{}.pdf".format(model)))
+    plt.savefig(os.path.join(path, "{}.pdf".format(model)), bbox_inches="tight")
+
+    def highlight_cell(x, y, ax=None, **kwargs):
+        rect = plt.Rectangle((x - .5, y - .5), 1, 1, fill=False, **kwargs)
+        ax = ax or plt.gca()
+        ax.add_patch(rect)
+        return rect
 
     for k, v in model_space.items():
+        # if k not in [168911, 16909, 9981, 10101, 146212, 146821]:
+        #     continue
         plt.clf()
         mat = plt.matshow(v.values)
+        nfidelities = v.shape[0]
+        fidelities = v.index.values
+        for i in range(1, nfidelities):
+            highlight_cell(np.clip(i-1, 0, nfidelities - 1), i, color="fuchsia", linewidth=3)
+        for i in range(nfidelities - 1):
+            highlight_cell(i, nfidelities - 1, color="fuchsia", linewidth=3)
         plt.colorbar(mat, label="{} correlation".format(corr_type))
+        plt.xticks(range(nfidelities), fidelities)  #, rotation=15)
+        plt.yticks(range(nfidelities), fidelities)
         plt.title("{} on Task ID {}".format(model, k))
-        plt.savefig(os.path.join(path, "{}_{}.png".format(model, k)))
+        plt.savefig(os.path.join(path, "{}_{}.png".format(model, k)), bbox_inches="tight")
     return plt
 
 
@@ -305,8 +326,9 @@ if __name__ == "__main__":
     plt.show()
 
     # helper
-    model = "xgb"
-    path = "results/{}/aac".format(model)
+    model = "lr"
+    plot_type = "correlation"
+    path = "results/{}/{}".format(model, plot_type)
     tids = os.listdir("nemo_dump/{}/1/{}".format(model, model))
     tids = [int(t) for t in tids]
 
