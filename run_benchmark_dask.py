@@ -7,7 +7,7 @@ from typing import Dict
 from loguru import logger
 from distributed import Lock
 
-from hpobench.benchmarks.ml_mmfb import *
+from hpobench.benchmarks.ml import *
 
 from utils.util import *
 from utils.util import all_task_ids_by_in_mem_size, read_openml_splits

@@ -41,9 +41,10 @@ if __name__ == "__main__":
         print("Verifying {:>2}/{:>2}: {}".format(i, len(path_list), path))
         task_id = int(path.split("/")[-2])
         try:
-            benchmark = TabularBenchmark(path=path, model=args.model, task_id=task_id)
-            config = benchmark.x_cs.sample_configuration()
-            fidelity = benchmark.z_cs.sample_configuration()
+            data_dir = os.path.join(*path.split("/")[:-3])
+            benchmark = TabularBenchmark(data_dir=data_dir, model=args.model, task_id=task_id)
+            config = benchmark.configuration_space.sample_configuration()
+            fidelity = benchmark.fidelity_space.sample_configuration()
             res = benchmark.objective_function(config, fidelity)
             res = benchmark.objective_function_test(config, fidelity)
             print("PASSED!")
