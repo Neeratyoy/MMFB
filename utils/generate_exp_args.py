@@ -16,7 +16,7 @@ def update_yaml_entry(model, task_id, time_limit):
         time_limit_in_s=1000,
         cutoff_in_s=1000,
         mem_limit_in_mb=6000,
-        import_from="ml_mmfb.xgboost_benchmark",
+        import_from="ml.xgboost_benchmark",
         import_benchmark="",
         main_fidelity="",
         is_surrogate=True,
@@ -25,8 +25,8 @@ def update_yaml_entry(model, task_id, time_limit):
     template_dict["time_limit_in_s"] = time_limit
     template_dict["cutoff_in_s"] = time_limit
     template_dict["bench_args"]["task_id"] = task_id
-    template_dict["import_from"] = "ml_mmfb.{}_benchmark".format(model)
-    template_dict["import_benchmark"] = param_space_dict[model][1].__name__
+    template_dict["import_from"] = "ml.tabular_benchmark"
+    template_dict["import_benchmark"] = "TabularBenchmark"
     template_dict["main_fidelity"] = fidelity_names[model]
     return template_dict
 
@@ -52,7 +52,7 @@ def input_arguments():
         "--path",
         default=None,
         type=str,
-        help="The path where all task IDs are dumped --- path/task_id is the expected path"
+        help="The path where all models directories are"
     )
     parser.add_argument(
         "--output_path",
