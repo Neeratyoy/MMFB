@@ -12,7 +12,7 @@ from joblib.parallel import Parallel, parallel_backend, delayed
 
 from hpobench.dependencies.ml.ml_benchmark_template import metrics
 
-from utils.util import get_discrete_configspace
+from utils.util import get_discrete_configspace, get_fidelity_grid
 
 
 splits = ["train", "val", "test"]
@@ -196,13 +196,27 @@ if __name__ == "__main__":
     for hp in config_spaces["x_discrete"].get_hyperparameters():
         hp.default_value = float(hp.default_value)
         hp.sequence = tuple(np.array(hp.sequence).astype(float))
+
+    # This if-block has been introduced explicitly for SVM that fixes the np.float32 type cast on
+    # enforced in the old get_fidelity_grid function that was used for bulk of the SVM collection
+    if metadata["exp_args"]["space"] == "svm":
+        z_grid = get_fidelity_grid(
+            config_spaces["z"],
+            metadata["exp_args"]["z_grid_size"],
+            include_sh_budgets=metadata["exp_args"]["include_SH"]
+        )
+        z_grid = tuple([f[0] for f in z_grid])
+        hp = config_spaces["z_discrete"].get_hyperparameter("subsample")
+        hp.sequence = z_grid
+        hp.default_value = z_grid[-1]
+
     for hp in config_spaces["z_discrete"].get_hyperparameters():
         if isinstance(hp.default_value, (np.float16, np.float32, np.float64)):
-            hp.default_value = float(hp.default_value)
             hp.sequence = tuple(float(val) for val in hp.sequence)
+            hp.default_value = float(hp.sequence[-1])
         else:
-            hp.default_value = int(hp.default_value)
             hp.sequence = tuple(int(val) for val in hp.sequence)
+            hp.default_value = int(hp.sequence[-1])
     for k, _space in config_spaces.items():
         config_spaces[k] = json_cs.write(_space)
     metadata["config_spaces"] = config_spaces
