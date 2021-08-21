@@ -20,11 +20,12 @@ def update_yaml_entry(model, task_id, time_limit):
         import_benchmark="",
         main_fidelity="",
         is_surrogate=True,
-        bench_args=dict(task_id=12345)
+        bench_args=dict(task_id=12345, model="model")
     )
     template_dict["time_limit_in_s"] = time_limit
     template_dict["cutoff_in_s"] = time_limit
     template_dict["bench_args"]["task_id"] = task_id
+    template_dict["bench_args"]["model"] = model
     template_dict["import_from"] = "ml.tabular_benchmark"
     template_dict["import_benchmark"] = "TabularBenchmark"
     template_dict["main_fidelity"] = fidelity_names[model]
