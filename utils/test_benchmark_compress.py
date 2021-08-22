@@ -200,9 +200,15 @@ if __name__ == "__main__":
             if split in global_mins:
                 global_mins[split][m] = _global_mins[colname]
             df = df.drop(colname, axis=1)
-    # type cast only the hyperparameters
-    hp_len = len(x_discrete.get_hyperparameters())
-    df[param_names[:hp_len]] = df[param_names[:hp_len]].astype(np.float32)
+
+    if metadata["exp_args"]["space"] == "svm":
+        # type cast the hyperparameters + fidelities (for float fidelities)
+        valid_param_len = len(x_discrete.get_hyperparameters()) + \
+                          len(z_discrete.get_hyperparameters())
+    else:
+        # type cast only the hyperparameters (for integer fidelities)
+        valid_param_len = len(x_discrete.get_hyperparameters())
+    df[param_names[:valid_param_len]] = df[param_names[:valid_param_len]].astype(np.float32)
     df["seed"] = df["seed"].astype(int)
     print(global_mins)
 
