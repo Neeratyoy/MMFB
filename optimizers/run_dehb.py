@@ -115,7 +115,7 @@ if __name__ == "__main__":
     if len(fidelity_info) > 1:
         assert "Supports only multi-fidelity (1-d) and not multi-multi-fidelity (>1-d)!"
     fidelity_name, min_budget, max_budget = fidelity_info[0]
-    global_best = benchmark.get_global_min()['val']
+    global_best = benchmark.get_global_min("val")["acc"]
     eval_type = "test" if args.test else "val"
     output_path = os.path.join(args.output_path, space, str(task_id))
     os.makedirs(output_path, exist_ok=True)

@@ -85,6 +85,18 @@ def joblib_fn(count, entry, param_names):
     return _df
 
 
+def extract_global_minimums(table, fidelity_names, true_param_len):
+    mask = [True] * table.shape[0]
+    # finding full budget evaluations
+    for f in fidelity_names:
+        mask *= table[f].values == table[f].values.max()
+    max_table = table[mask]
+    max_table = max_table.iloc[:, true_param_len:]
+    min_dict = pd.Series(1 - max_table.max(axis=0)).to_dict()
+    min_dict = pd.Series(max_table.max(axis=0)).to_dict()
+    return min_dict
+
+
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
@@ -142,6 +154,7 @@ if __name__ == "__main__":
     param_list.append(seeds)
     param_names.append("seed")
     param_names.append("result")
+    true_param_len = len(param_names)
     # Important to record values to calculate global minimas efficiently
     for m in metrics.keys():
         for split in splits:
@@ -161,26 +174,23 @@ if __name__ == "__main__":
     dfs = [_df for _df in dfs if isinstance(_df, pd.DataFrame)]
 
     df = pd.concat(dfs).sort_index()
-    incumbents = dict()
+    _global_mins = extract_global_minimums(
+        df, z_discrete.get_hyperparameter_names(), true_param_len
+    )
+
+    global_mins = dict(val=dict(), test=dict())
+
     for m in metrics.keys():
-        incumbents[m] = dict()
         for split in splits:
             split_key = "{}_scores".format(split)
             colname = "{}_{}".format(m, split_key)
             param_names.remove(colname)
-            incumbents[m][split_key] = df[colname].values.min()
+            if split in global_mins:
+                global_mins[split][m] = _global_mins[colname]
             df = df.drop(colname, axis=1)
     df[param_names[:-1]] = df.drop("result", axis=1).astype(np.float32)
     df["seed"] = df["seed"].astype(int)
-    print(incumbents)
-    for k, v in incumbents.items():
-        v["train"] = v["train_scores"]
-        v["val"] = v["val_scores"]
-        v["test"] = v["test_scores"]
-        v.pop("train_scores")
-        v.pop("val_scores")
-        v.pop("test_scores")
-        incumbents[k] = v
+    print(global_mins)
 
     assert len(missing) == 0, "Incomplete collection: {} missing evaluations!\n" \
                               "Dumping missing indexes at {}".format(
@@ -191,7 +201,7 @@ if __name__ == "__main__":
     os.makedirs(output_path, exist_ok=True)
     df.to_parquet(os.path.join(output_path, "{}_{}_data.parquet.gzip".format(space, task_id)))
     print("\nCompressed table saved!")
-    metadata["global_min"] = incumbents
+    metadata["global_min"] = global_mins
     # Converting discrete config space values to float: np.float32 not JSON serializable
     for hp in config_spaces["x_discrete"].get_hyperparameters():
         hp.default_value = float(hp.default_value)
