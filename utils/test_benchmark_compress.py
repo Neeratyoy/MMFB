@@ -86,14 +86,26 @@ def joblib_fn(count, entry, param_names):
 
 
 def extract_global_minimums(table, fidelity_names, true_param_len):
+    """ Calculates the minima across only full budget evaluations averaged across seeds
+    """
     mask = [True] * table.shape[0]
     # finding full budget evaluations
     for f in fidelity_names:
         mask *= table[f].values == table[f].values.max()
     max_table = table[mask]
-    max_table = max_table.iloc[:, true_param_len:]
-    min_dict = pd.Series(1 - max_table.max(axis=0)).to_dict()
-    min_dict = pd.Series(max_table.max(axis=0)).to_dict()
+    seeds = max_table.seed.unique()
+    per_seed_table = dict()
+    # subsetting per seed
+    for seed in seeds:
+        # subsetting only the metrics for each seed (columns after `true_param_len`)
+        per_seed_table[seed] = max_table[max_table.seed == seed].iloc[:, true_param_len:]
+    mean_score = np.zeros(per_seed_table[seeds[0]].shape)
+    # averaging each metric over seeds
+    for seed in seeds:
+        mean_score += per_seed_table[seed].values
+    mean_score /= len(seeds)
+    mean_df = pd.DataFrame(mean_score, columns=per_seed_table[seeds[0]].columns)
+    min_dict = mean_df.min(axis=0).to_dict()
     return min_dict
 
 
@@ -179,7 +191,6 @@ if __name__ == "__main__":
     )
 
     global_mins = dict(val=dict(), test=dict())
-
     for m in metrics.keys():
         for split in splits:
             split_key = "{}_scores".format(split)
@@ -188,7 +199,9 @@ if __name__ == "__main__":
             if split in global_mins:
                 global_mins[split][m] = _global_mins[colname]
             df = df.drop(colname, axis=1)
-    df[param_names[:-1]] = df.drop("result", axis=1).astype(np.float32)
+    # type cast only the hyperparameters
+    hp_len = len(x_discrete.get_hyperparameters())
+    df[param_names[:hp_len]] = df[param_names[:hp_len]].astype(np.float32)
     df["seed"] = df["seed"].astype(int)
     print(global_mins)
 
