@@ -105,6 +105,7 @@ def extract_global_minimums(table, fidelity_names, true_param_len):
         mean_score += per_seed_table[seed].values
     mean_score /= len(seeds)
     mean_df = pd.DataFrame(mean_score, columns=per_seed_table[seeds[0]].columns)
+    # recording the minimum loss achieved across the mean score
     min_dict = mean_df.min(axis=0).to_dict()
     return min_dict
 
