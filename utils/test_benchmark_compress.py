@@ -187,9 +187,13 @@ if __name__ == "__main__":
     dfs = [_df for _df in dfs if isinstance(_df, pd.DataFrame)]
 
     df = pd.concat(dfs).sort_index()
-    _global_mins = extract_global_minimums(
-        df, z_discrete.get_hyperparameter_names(), true_param_len
-    )
+    try:
+        _global_mins = extract_global_minimums(
+            df, z_discrete.get_hyperparameter_names(), true_param_len
+        )
+    except Exception as e:
+        print(repr(e))
+        _global_mins = None
 
     global_mins = dict(val=dict(), test=dict())
     for m in metrics.keys():
@@ -197,7 +201,7 @@ if __name__ == "__main__":
             split_key = "{}_scores".format(split)
             colname = "{}_{}".format(m, split_key)
             param_names.remove(colname)
-            if split in global_mins:
+            if split in global_mins and _global_mins is not None:
                 global_mins[split][m] = _global_mins[colname]
             df = df.drop(colname, axis=1)
 
