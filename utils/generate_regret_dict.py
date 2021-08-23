@@ -53,6 +53,12 @@ def input_arguments():
         type=str,
         help="The path to dump yaml file"
     )
+    parser.add_argument(
+        "--n_jobs",
+        default=4,
+        type=int,
+        help="number of cores"
+    )
     args = parser.parse_args()
     return args
 
