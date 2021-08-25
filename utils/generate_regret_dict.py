@@ -19,7 +19,7 @@ def find_global_maximum(table, model):
     for seed in seeds:
         table_per_seed[seed] = table[table.seed == seed]
         vals_per_seed.append(np.array([res["function_value"] for res in table_per_seed[seed].result.values]))
-    global_maximum = np.array(vals_per_seed).mean(axis=0).max()
+    global_maximum = float(np.array(vals_per_seed).mean(axis=0).max())
     return global_maximum
 
 
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     with parallel_backend(backend="multiprocessing", n_jobs=args.n_jobs):
         dicts = Parallel()(
             delayed(update_dict_entry)(
-                key, args.path, value["time_limit_in_s"]
+                key, args.path
             ) for key, value in benches.items()
         )
     tabular_dict = dict()
