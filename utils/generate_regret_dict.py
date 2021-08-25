@@ -1,18 +1,35 @@
 import os
 import yaml
 import argparse
+import numpy as np
 from joblib.parallel import Parallel, parallel_backend, delayed
 
 from hpobench.benchmarks.ml import TabularBenchmark
 from HPOBenchExperimentUtils.utils.runner_utils import load_benchmark_settings
 
+from plotters.plot_utils import fidelity_name
 
-def update_dict_entry(key, path, time_limit):
+
+def find_global_maximum(table, model):
+    full_budget = table[fidelity_names[model]].values.max()
+    table = table[table[fidelity_names[model]] == full_budget]
+    table_per_seed = dict()
+    vals_per_seed = []
+    seeds = np.unique(table.seed.values)
+    for seed in seeds:
+        table_per_seed[seed] = table[table.seed == seed]
+        vals_per_seed.append(np.array([res["function_value"] for res in table_per_seed[seed].result.values]))
+    global_maximum = np.array(vals_per_seed).mean(axis=0).max()
+    return global_maximum
+
+
+def update_dict_entry(key, path):
     model, task_id = key.split("_")
     task_id = int(task_id)
     benchmark = TabularBenchmark(data_dir=path, model=model, task_id=task_id)
     ystar_valid = benchmark.global_minimums["val"]["acc"]
     ystar_test = benchmark.global_minimums["test"]["acc"]
+    y_max = find_global_maximum(benchmark.table, model)
     template_dict = dict(
         xlim_lo=10 ** -1,
         ylim_lo=0,
@@ -20,7 +37,8 @@ def update_dict_entry(key, path, time_limit):
         xscale="log",
         yscale="log",
         ystar_valid=ystar_valid,
-        ystar_test=ystar_test
+        ystar_test=ystar_test,
+        y_max=y_max,
     )
     config_dict = {key: template_dict}
     return config_dict
