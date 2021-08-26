@@ -7,7 +7,7 @@ from joblib.parallel import Parallel, parallel_backend, delayed
 from hpobench.benchmarks.ml import TabularBenchmark
 from HPOBenchExperimentUtils.utils.runner_utils import load_benchmark_settings
 
-from plotters.plot_utils import fidelity_name
+from plotters.plot_utils import fidelity_names
 
 
 def find_global_maximum(table, model):
