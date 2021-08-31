@@ -7,6 +7,7 @@ tmp_dump/
 notebooks/
 *_dump/
 logs/
+misc/
 
 # files
 *.pkl
