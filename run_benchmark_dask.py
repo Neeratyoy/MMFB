@@ -21,12 +21,12 @@ _logger_props = {
 }
 
 param_space_dict = dict(
-    lr=LRBenchmark,
-    rf=RandomForestBenchmark,
-    nn=NNBenchmark,
-    svm=SVMBenchmark,
-    histgb=HistGBBenchmark,
-    xgb=XGBoostBenchmark,
+    lr={0: LRBenchmark, 1: LRBenchmarkMF, 2: LRBenchmarkBB},
+    rf={0: RandomForestBenchmark, 1: RandomForestBenchmarkMF, 2: RandomForestBenchmarkBB},
+    nn={0: NNBenchmark, 1: NNBenchmarkMF, 2: NNBenchmarkBB},
+    svm={0: SVMBenchmark, 1: SVMBenchmarkMF, 2: SVMBenchmarkBB},
+    xgb={0: XGBoostBenchmark, 1: XGBoostBenchmarkMF, 2: XGBoostBenchmarkBB},
+    histgb={0: HistGBBenchmark, 1: HistGBBenchmarkMF, 2: HistGBBenchmarkBB},
 )
 
 
@@ -37,7 +37,7 @@ def config2hash(config):
 
 
 def return_dict(combination: Tuple) -> Dict:
-    assert len(combination) == 10
+    assert len(combination) == 9
     evaluation = dict()
     evaluation["task_id"] = combination[0]
     evaluation["config"] = combination[1]
@@ -48,7 +48,6 @@ def return_dict(combination: Tuple) -> Dict:
     evaluation["fidelity_choice"] = combination[6]
     evaluation["id"] = combination[7]
     evaluation["space"] = combination[8]
-    evaluation["lock"] = combination[9]
     return evaluation
 
 
@@ -89,21 +88,16 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     fidelity_choice = evaluation["fidelity_choice"]
     i = evaluation["id"]
     model_space = evaluation["space"]
-    lock = evaluation["lock"]
     task_path = os.path.join(path, str(task_id))
     os.makedirs(task_path, exist_ok=True)
 
     start = time.time()
-    # benchmark = benchmarks[task_id][seed]
     benchmark = model_space(
         task_id=task_id,
-        seed=seed,
-        fidelity_choice=fidelity_choice,
+        rng=seed,
         data_path=data_path
     )
     if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
-        # if isinstance(lock, Lock):
-        #     lock.acquire()
         # load splits from specified path
         benchmark.train_X, \
         benchmark.train_y, \
@@ -111,8 +105,6 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         benchmark.valid_y, \
         benchmark.test_X, \
         benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
-        # if isinstance(lock, Lock):
-        #     lock.release()
     # the lookup dict key for each evaluation is a 4-element tuple
     end1 = time.time()
     print("Time to load: {:.5f}".format(end1 - start))
@@ -258,11 +250,9 @@ if __name__ == "__main__":
         args.output_path = os.path.join(args.output_path, args.exp_name)
 
     # Choosing parameter space
-    param_space = param_space_dict[args.space]
+    param_space = param_space_dict[args.space][args.fidelity_choice]
 
     # Task input check
-    # automl_benchmark = openml.study.get_suite(218)
-    # task_ids = automl_benchmark.tasks
     task_ids = all_task_ids_by_in_mem_size
     if args.n_tasks is None and args.task_id is None:
         warnings.warn("Both task_id or number of tasks were not specified. "
@@ -314,49 +304,31 @@ if __name__ == "__main__":
     seeds = np.random.randint(1, 10000, size=args.n_seeds)
     logger.info("Seeds selected {}".format(seeds))
 
-    # Loading benchmarks
-    # benchmarks = dict()
-    # for task_id in task_ids:
-    #     benchmarks[task_id] = dict()
-    #     for seed in seeds:
-    #         logger.info("Processing benchmark for task {} for seed {}".format(task_id, seed))
-    #         benchmarks[task_id][seed] = param_space(
-    #             task_id=task_id,
-    #             seed=seed,
-    #             fidelity_choice=args.fidelity_choice,
-    #             data_path=args.data_path
-    #         )
-    #         benchmarks[task_id][seed].load_data_from_openml()
-    #         break
-    # logger.info("Total size of {} benchmark objects in memory: {:.5f} MB".format(
-    #     len(task_ids) * len(seeds), obj_size(benchmarks)
-    # ))
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = param_space(
         task_id=task_ids[0],
-        seed=seeds[0],
-        fidelity_choice=args.fidelity_choice,
+        rng=seeds[0],
         data_path=args.data_path
     )
 
     # Saving a copy of the ConfigSpaces used for this run
     with open(os.path.join(base_path, "param_space.pkl"), "wb") as f:
-        pickle.dump(benchmark.x_cs, f)  # hyper-parameter configuration space
+        pickle.dump(benchmark.configuration_space, f)  # hyper-parameter configuration space
     with open(os.path.join(path, "fidelity_space.pkl"), "wb") as f:
-        pickle.dump(benchmark.z_cs, f)  # fidelity configuration space
+        pickle.dump(benchmark.fidelity_space, f)  # fidelity configuration space
 
     # Retrieving observation space and populating grid
-    x_cs = benchmark.x_cs
+    configuration_space = benchmark.configuration_space
     logger.info("Populating grid for observation space...")
-    grid_config = get_parameter_grid(x_cs, args.x_grid_size, convert_to_configspace=False)
+    grid_config = get_parameter_grid(configuration_space, args.x_grid_size, convert_to_configspace=False)
     logger.info("{} unique observations generated".format(len(grid_config)))
     logger.debug("Observation space grid size: {:.2f} MB".format(obj_size(grid_config)))
 
     # Retrieving fidelity spaces and populating grid
-    z_cs = benchmark.z_cs
+    fidelity_space = benchmark.fidelity_space
     logger.info("Populating grid for fidelity space...")
     grid_fidelity = get_fidelity_grid(
-        z_cs, args.z_grid_size, convert_to_configspace=False, include_sh_budgets=args.include_SH
+        fidelity_space, args.z_grid_size, convert_to_configspace=False, include_sh_budgets=args.include_SH
     )
     logger.info("{} unique fidelity configurations generated".format(len(grid_fidelity)))
     logger.debug("Fidelity space grid size: {:.2f} MB".format(obj_size(grid_fidelity)))
@@ -367,7 +339,6 @@ if __name__ == "__main__":
         logger.info("Connecting to scheduler...")
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
-        lock = Lock(str(task_ids[0]), client)
         num_workers = client.n_workers
         # client.distribute_data_to_workers(benchmarks)
         logger.info("Dask Client information: {}".format(client.client))
@@ -406,13 +377,12 @@ if __name__ == "__main__":
             logger.debug("Skipping and continuing evaluation..")
             continue
         combination = list(combination)
-        combination[1] = map_to_config(x_cs, combination[1])
-        combination[2] = map_to_config(z_cs, combination[2])
+        combination[1] = map_to_config(configuration_space, combination[1])
+        combination[2] = map_to_config(fidelity_space, combination[2])
         combination.append(args.data_path)
         combination.append(args.fidelity_choice)
         combination.append(i)
         combination.append(param_space)
-        combination.append(lock)
         if num_workers == 1:
             compute(return_dict(combination))
             continue
@@ -436,9 +406,6 @@ if __name__ == "__main__":
                 wait_count += 1
                 time.sleep(0.1)  # wait for 100 milliseconds before querying for futures
                 client.fetch_futures(retries=1, wait_time=0.0)
-            # if wait_count > 10:
-            #     client.update_n_workers()
-            #     client.update_n_workers()
     if num_workers > 1 and client.is_worker_alive():
         logger.info("Waiting for pending workers...")
         while num_workers > 1 and client.is_worker_alive():

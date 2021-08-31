@@ -10,9 +10,9 @@ from collections import OrderedDict
 from ConfigSpace.read_and_write import json as json_cs
 from joblib.parallel import Parallel, parallel_backend, delayed
 
-from hpobench.benchmarks.ml.ml_benchmark_template import metrics
+from hpobench.dependencies.ml.ml_benchmark_template import metrics
 
-from utils.util import get_discrete_configspace
+from utils.util import get_discrete_configspace, get_fidelity_grid
 
 
 splits = ["train", "val", "test"]
@@ -85,6 +85,31 @@ def joblib_fn(count, entry, param_names):
     return _df
 
 
+def extract_global_minimums(table, fidelity_names, true_param_len):
+    """ Calculates the minima across only full budget evaluations averaged across seeds
+    """
+    mask = [True] * table.shape[0]
+    # finding full budget evaluations
+    for f in fidelity_names:
+        mask *= table[f].values == table[f].values.max()
+    max_table = table[mask]
+    seeds = max_table.seed.unique()
+    per_seed_table = dict()
+    # subsetting per seed
+    for seed in seeds:
+        # subsetting only the metrics for each seed (columns after `true_param_len`)
+        per_seed_table[seed] = max_table[max_table.seed == seed].iloc[:, true_param_len:]
+    mean_score = np.zeros(per_seed_table[seeds[0]].shape)
+    # averaging each metric over seeds
+    for seed in seeds:
+        mean_score += per_seed_table[seed].values
+    mean_score /= len(seeds)
+    mean_df = pd.DataFrame(mean_score, columns=per_seed_table[seeds[0]].columns)
+    # recording the minimum loss achieved across the mean score
+    min_dict = mean_df.min(axis=0).to_dict()
+    return min_dict
+
+
 def input_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
@@ -142,6 +167,7 @@ if __name__ == "__main__":
     param_list.append(seeds)
     param_names.append("seed")
     param_names.append("result")
+    true_param_len = len(param_names)
     # Important to record values to calculate global minimas efficiently
     for m in metrics.keys():
         for split in splits:
@@ -161,26 +187,34 @@ if __name__ == "__main__":
     dfs = [_df for _df in dfs if isinstance(_df, pd.DataFrame)]
 
     df = pd.concat(dfs).sort_index()
-    incumbents = dict()
+    try:
+        _global_mins = extract_global_minimums(
+            df, z_discrete.get_hyperparameter_names(), true_param_len
+        )
+    except Exception as e:
+        print(repr(e))
+        _global_mins = None
+
+    global_mins = dict(val=dict(), test=dict())
     for m in metrics.keys():
-        incumbents[m] = dict()
         for split in splits:
             split_key = "{}_scores".format(split)
             colname = "{}_{}".format(m, split_key)
             param_names.remove(colname)
-            incumbents[m][split_key] = df[colname].values.min()
+            if split in global_mins and _global_mins is not None:
+                global_mins[split][m] = _global_mins[colname]
             df = df.drop(colname, axis=1)
-    df[param_names[:-1]] = df.drop("result", axis=1).astype(np.float32)
+
+    if metadata["exp_args"]["space"] == "svm":
+        # type cast the hyperparameters + fidelities (for float fidelities)
+        valid_param_len = len(x_discrete.get_hyperparameters()) + \
+                          len(z_discrete.get_hyperparameters())
+    else:
+        # type cast only the hyperparameters (for integer fidelities)
+        valid_param_len = len(x_discrete.get_hyperparameters())
+    df[param_names[:valid_param_len]] = df[param_names[:valid_param_len]].astype(np.float32)
     df["seed"] = df["seed"].astype(int)
-    print(incumbents)
-    for k, v in incumbents.items():
-        v["train"] = v["train_scores"]
-        v["val"] = v["val_scores"]
-        v["test"] = v["test_scores"]
-        v.pop("train_scores")
-        v.pop("val_scores")
-        v.pop("test_scores")
-        incumbents[k] = v
+    print(global_mins)
 
     assert len(missing) == 0, "Incomplete collection: {} missing evaluations!\n" \
                               "Dumping missing indexes at {}".format(
@@ -191,18 +225,32 @@ if __name__ == "__main__":
     os.makedirs(output_path, exist_ok=True)
     df.to_parquet(os.path.join(output_path, "{}_{}_data.parquet.gzip".format(space, task_id)))
     print("\nCompressed table saved!")
-    metadata["global_min"] = incumbents
+    metadata["global_min"] = global_mins
     # Converting discrete config space values to float: np.float32 not JSON serializable
     for hp in config_spaces["x_discrete"].get_hyperparameters():
         hp.default_value = float(hp.default_value)
         hp.sequence = tuple(np.array(hp.sequence).astype(float))
+
+    # This if-block has been introduced explicitly for SVM that fixes the np.float32 type cast on
+    # enforced in the old get_fidelity_grid function that was used for bulk of the SVM collection
+    if metadata["exp_args"]["space"] == "svm":
+        z_grid = get_fidelity_grid(
+            config_spaces["z"],
+            metadata["exp_args"]["z_grid_size"],
+            include_sh_budgets=metadata["exp_args"]["include_SH"]
+        )
+        z_grid = tuple([f[0] for f in z_grid])
+        hp = config_spaces["z_discrete"].get_hyperparameter("subsample")
+        hp.sequence = z_grid
+        hp.default_value = z_grid[-1]
+
     for hp in config_spaces["z_discrete"].get_hyperparameters():
         if isinstance(hp.default_value, (np.float16, np.float32, np.float64)):
-            hp.default_value = float(hp.default_value)
             hp.sequence = tuple(float(val) for val in hp.sequence)
+            hp.default_value = float(hp.sequence[-1])
         else:
-            hp.default_value = int(hp.default_value)
             hp.sequence = tuple(int(val) for val in hp.sequence)
+            hp.default_value = int(hp.sequence[-1])
     for k, _space in config_spaces.items():
         config_spaces[k] = json_cs.write(_space)
     metadata["config_spaces"] = config_spaces
