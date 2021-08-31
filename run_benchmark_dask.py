@@ -37,7 +37,7 @@ def config2hash(config):
 
 
 def return_dict(combination: Tuple) -> Dict:
-    assert len(combination) == 10
+    assert len(combination) == 9
     evaluation = dict()
     evaluation["task_id"] = combination[0]
     evaluation["config"] = combination[1]
@@ -48,7 +48,6 @@ def return_dict(combination: Tuple) -> Dict:
     evaluation["fidelity_choice"] = combination[6]
     evaluation["id"] = combination[7]
     evaluation["space"] = combination[8]
-    evaluation["lock"] = combination[9]
     return evaluation
 
 
@@ -89,21 +88,16 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
     fidelity_choice = evaluation["fidelity_choice"]
     i = evaluation["id"]
     model_space = evaluation["space"]
-    lock = evaluation["lock"]
     task_path = os.path.join(path, str(task_id))
     os.makedirs(task_path, exist_ok=True)
 
     start = time.time()
-    # benchmark = benchmarks[task_id][seed]
     benchmark = model_space(
         task_id=task_id,
-        # seed=seed,
         rng=seed,
         data_path=data_path
     )
     if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
-        # if isinstance(lock, Lock):
-        #     lock.acquire()
         # load splits from specified path
         benchmark.train_X, \
         benchmark.train_y, \
@@ -111,8 +105,6 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         benchmark.valid_y, \
         benchmark.test_X, \
         benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
-        # if isinstance(lock, Lock):
-        #     lock.release()
     # the lookup dict key for each evaluation is a 4-element tuple
     end1 = time.time()
     print("Time to load: {:.5f}".format(end1 - start))
@@ -261,8 +253,6 @@ if __name__ == "__main__":
     param_space = param_space_dict[args.space][args.fidelity_choice]
 
     # Task input check
-    # automl_benchmark = openml.study.get_suite(218)
-    # task_ids = automl_benchmark.tasks
     task_ids = all_task_ids_by_in_mem_size
     if args.n_tasks is None and args.task_id is None:
         warnings.warn("Both task_id or number of tasks were not specified. "
@@ -317,7 +307,6 @@ if __name__ == "__main__":
     # Placeholder benchmark to retrieve parameter spaces
     benchmark = param_space(
         task_id=task_ids[0],
-        # seed=seeds[0],
         rng=seeds[0],
         data_path=args.data_path
     )
@@ -350,7 +339,6 @@ if __name__ == "__main__":
         logger.info("Connecting to scheduler...")
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
-        lock = Lock(str(task_ids[0]), client)
         num_workers = client.n_workers
         # client.distribute_data_to_workers(benchmarks)
         logger.info("Dask Client information: {}".format(client.client))
@@ -395,7 +383,6 @@ if __name__ == "__main__":
         combination.append(args.fidelity_choice)
         combination.append(i)
         combination.append(param_space)
-        combination.append(lock)
         if num_workers == 1:
             compute(return_dict(combination))
             continue
@@ -419,9 +406,6 @@ if __name__ == "__main__":
                 wait_count += 1
                 time.sleep(0.1)  # wait for 100 milliseconds before querying for futures
                 client.fetch_futures(retries=1, wait_time=0.0)
-            # if wait_count > 10:
-            #     client.update_n_workers()
-            #     client.update_n_workers()
     if num_workers > 1 and client.is_worker_alive():
         logger.info("Waiting for pending workers...")
         while num_workers > 1 and client.is_worker_alive():
