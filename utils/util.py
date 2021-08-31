@@ -238,15 +238,15 @@ def get_fidelity_grid(
                 grid = np.exp(np.linspace(
                     np.log(hp.lower), np.log(hp.upper), grid_step_size
                 ))
-                grid = np.clip(grid, hp.lower, hp.upper).astype(np.float32)
+                grid = np.clip(grid, hp.lower, hp.upper)  #.astype(np.float32)
             else:
-                grid = np.linspace(hp.lower, hp.upper, grid_step_size, dtype=np.float32)
+                grid = np.linspace(hp.lower, hp.upper, grid_step_size)  #, dtype=np.float32)
             if include_sh_budgets:
                 hb_grid = np.array([])
                 for eta in selected_etas:
                     hb_grid = np.concatenate(
                         (hb_grid, generate_SH_fidelities(hp.lower, hp.upper, eta))
-                    ).astype(np.float32)
+                    )  # .astype(np.float32)
                 grid = np.unique(np.concatenate((hb_grid, grid)))
             grid = grid.astype(int) if isinstance(hp, CS.UniformIntegerHyperparameter) else grid
             param_ranges.append(np.unique(grid))

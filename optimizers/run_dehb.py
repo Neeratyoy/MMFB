@@ -6,7 +6,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from hpobench.benchmarks.ml import TabularBenchmark
-from hpobench.benchmarks.ml.ml_benchmark_template import metrics
+from hpobench.dependencies.ml.ml_benchmark_template import metrics
 
 from dehb import DEHB
 
@@ -16,11 +16,10 @@ def target_function(config, budget, **kwargs):
     metric = kwargs["metric"]
     test = kwargs["test"]
     fidelity_name = kwargs["fidelity_name"]
-    fidelity = benchmark.z_cs.sample_configuration()
+    fidelity = benchmark.fidelity_space.sample_configuration()
     if isinstance(fidelity[fidelity_name], (int, np.int32, np.int64)):
-        fidelity[fidelity_name] = int(budget)
-    else:
-        fidelity[fidelity_name] = np.float32(budget)
+        budget = int(budget)
+    fidelity[fidelity_name] = budget  # np.float32(budget)
     if test:
         res = benchmark.objective_function_test(config, fidelity, metric=metric)
     else:
@@ -107,7 +106,7 @@ if __name__ == "__main__":
     print(os.environ["PYTHONPATH"])
 
     benchmark = TabularBenchmark(
-        path=args.path, model=args.model, task_id=args.task_id, seed=args.seed
+        data_dir=args.path, model=args.model, task_id=args.task_id, seed=args.seed
     )
     task_id = benchmark.exp_args['task_id']
     space = benchmark.exp_args['space']
@@ -116,13 +115,13 @@ if __name__ == "__main__":
     if len(fidelity_info) > 1:
         assert "Supports only multi-fidelity (1-d) and not multi-multi-fidelity (>1-d)!"
     fidelity_name, min_budget, max_budget = fidelity_info[0]
-    global_best = benchmark.get_global_min()['val']
+    global_best = benchmark.get_global_min("val")["acc"]
     eval_type = "test" if args.test else "val"
     output_path = os.path.join(args.output_path, space, str(task_id))
     os.makedirs(output_path, exist_ok=True)
 
     dehb = DEHB(
-        f=target_function, cs=benchmark.x_cs,
+        f=target_function, cs=benchmark.configuration_space,
         min_budget=min_budget, max_budget=max_budget, eta=3,
         n_workers=1, output_path="./dehb_dump"
     )
