@@ -7,4 +7,4 @@ fidelity=1
 #path="nemo_dump/"$model"/"$fidelity"/benchmark/"
 path="/work/ws/nemo/fr_nm217-hpobench-0/full/"$model/$fidelity"/benchmark/"
 
-python utils/verify_pre_upload.py --path $path --model $model
+python utils/verify_pre_upload.py --path $path --model $model --skip_test
