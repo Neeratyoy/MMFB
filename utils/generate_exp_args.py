@@ -81,6 +81,12 @@ def input_arguments():
         help="Minimum runtime to cap to"
     )
     parser.add_argument(
+        "--max_runtime",
+        default=None,
+        type=float,
+        help="Minimum runtime to cap to"
+    )
+    parser.add_argument(
         "--raw",
         default=False,
         action="store_true",
@@ -121,6 +127,8 @@ if __name__ == "__main__":
         # Averaging costs across all configs
         mean_cost = cost_df.mean()
         time_limit_in_s = np.max((np.ceil(mean_cost * args.nsamples), args.min_runtime))
+        if args.max_runtime is not None:
+            time_limit_in_s = np.min((time_limit_in_s, args.max_runtime))
         print("{:<2}. Task ID {}: {} seconds -- {}".format(
             count, task_id, time_limit_in_s, np.log10(time_limit_in_s))
         )
