@@ -10,8 +10,10 @@ from utils.util import all_task_ids_by_in_mem_size, dump_yaml_args
 
 from hpobench.benchmarks.ml import TabularBenchmark
 
+from run_benchmark_dask import param_space_dict
 
-def update_yaml_entry(model, task_id, time_limit):
+
+def update_yaml_entry(model, task_id, time_limit, raw=False):
     template_dict = dict(
         time_limit_in_s=1000,
         cutoff_in_s=1000,
@@ -29,6 +31,11 @@ def update_yaml_entry(model, task_id, time_limit):
     template_dict["import_from"] = "ml.tabular_benchmark"
     template_dict["import_benchmark"] = "TabularBenchmark"
     template_dict["main_fidelity"] = fidelity_names[model]
+    if raw:
+        template_dict.update({"import_from": "ml"})
+        # imports the MF version
+        template_dict.update({"import_bencmark": param_space_dict[model][1].__name__})
+        template_dict.update({"is_surrogate": False})
     return template_dict
 
 
@@ -69,9 +76,15 @@ def input_arguments():
     )
     parser.add_argument(
         "--min_runtime",
-        default=0,
+        default=120,
         type=float,
         help="Minimum runtime to cap to"
+    )
+    parser.add_argument(
+        "--raw",
+        default=False,
+        action="store_true",
+        help="To run raw benchmark and not tabular"
     )
     args = parser.parse_args()
     return args
@@ -112,9 +125,14 @@ if __name__ == "__main__":
             count, task_id, time_limit_in_s, np.log10(time_limit_in_s))
         )
         # Update yaml config
-        new_config = update_yaml_entry(args.model, task_id, time_limit_in_s)
-        model_yaml["{}_{}".format(args.model, task_id)] = new_config
+        new_config = update_yaml_entry(args.model, task_id, time_limit_in_s, raw=args.raw)
+        if args.raw:
+            key_name = "{}_{}_raw".format(args.model, task_id)
+        else:
+            key_name = "{}_{}".format(args.model, task_id)
+        model_yaml[key_name] = new_config
     model_yaml = json_compatible_dict(model_yaml)
-    file_path = os.path.join(args.output_path, "{}_benchmark_settings.yaml").format(args.model)
+    filename = "benchmark_settings_raw" if args.raw else "benchmark_settings"
+    file_path = os.path.join(args.output_path, "{}_{}.yaml".format(args.model, filename))
     dump_yaml_args(model_yaml, file_path)
     print("Saved at {}!".format(file_path))
