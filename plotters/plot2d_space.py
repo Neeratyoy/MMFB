@@ -4,33 +4,9 @@ import itertools
 import numpy as np
 from matplotlib import pyplot as plt
 
-from plotters.plot_utils import fidelity_names
+from plotters.plot_utils import fidelity_names, process_table
 
 from hpobench.benchmarks.ml import TabularBenchmark
-
-
-def process_table(table, model, num_hps):
-    """ Function that takes the mean of loss and sum of costs for only the full budget evaluations
-    """
-    # extracting only info of interest, loss and cost
-    table["y"] = [res["function_value"] for res in table.result.values]
-    table["cost"] = [res["cost"] for res in table.result.values]
-    table = table.drop("result", axis=1)
-    # keeping only full budget evaluations
-    fidelity = fidelity_names[model]
-    full_budget = table[fidelity].max()
-    table = table[table[fidelity] == full_budget]
-    seeds = table.seed.unique()
-    loss = np.zeros(table.shape[0] // len(seeds))
-    costs = np.zeros(table.shape[0] // len(seeds))
-    for seed in seeds:
-        loss += table[table.seed == seed].y.values
-        costs += table[table.seed == seed].cost.values
-    loss = loss / len(seeds)
-    final_table = table[table.seed == seed].iloc[:, :num_hps]
-    final_table["y"] = loss
-    final_table["cost"] = costs
-    return final_table
 
 
 def input_arguments():

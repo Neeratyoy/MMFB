@@ -21,14 +21,37 @@ fidelity_names = dict(
 
 def load_benchmark(model, task_id, path="nemo_dump/{}/1/{}/{}/"):
     """ Loads the parquet compressed tabular benchmark """
-    model_path = path.format(model, model, task_id)
-    benchmark = TabularBenchmark(model_path, task_id=task_id, model=model)
+    benchmark = TabularBenchmark(data_dir=path, task_id=task_id, model=model)
     vals = [res["function_value"] for res in benchmark.table.result.values]
     seeds = benchmark.table.seed.unique().tolist()
     per_seed = dict()
     for seed in seeds:
         per_seed[seed] = benchmark.table.seed == 8916
     return benchmark, vals, per_seed
+
+
+def process_table(table, model, num_hps):
+    """ Function that takes the mean of loss and sum of costs for only the full budget evaluations
+    """
+    # extracting only info of interest, loss and cost
+    table["y"] = [res["function_value"] for res in table.result.values]
+    table["cost"] = [res["cost"] for res in table.result.values]
+    table = table.drop("result", axis=1)
+    # keeping only full budget evaluations
+    fidelity = fidelity_names[model]
+    full_budget = table[fidelity].max()
+    table = table[table[fidelity] == full_budget]
+    seeds = table.seed.unique()
+    loss = np.zeros(table.shape[0] // len(seeds))
+    costs = np.zeros(table.shape[0] // len(seeds))
+    for seed in seeds:
+        loss += table[table.seed == seed].y.values
+        costs += table[table.seed == seed].cost.values
+    loss = loss / len(seeds)
+    final_table = table[table.seed == seed].iloc[:, :num_hps]
+    final_table["y"] = loss
+    final_table["cost"] = costs
+    return final_table
 
 
 def get_normalized_costs(table, fid_name):
@@ -131,14 +154,14 @@ def calc_area_under_curve(vals, width):
     return area
 
 
-def rank_incumbent_across_fidelities(model, tids, path):
+def rank_incumbent_across_fidelities(model, tids, load_path, output_path, format="png"):
     """ Plot to show how the full budget best config is not the best in lower fidelities """
     auc_list = []
     for tid in np.sort(tids):
         print(tid, end='\r')
-        benchmark, val, _ = load_benchmark(model, tid)
-        full_budget = benchmark.table[fidelity_names[model]].max()
+        benchmark, val, _ = load_benchmark(model, tid, load_path)
         fidelities = benchmark.table[fidelity_names[model]].unique()
+        full_budget = fidelities.max()
         seeds = benchmark.table.seed.unique()
         ranks = dict()
         for seed in seeds:
@@ -147,47 +170,60 @@ def rank_incumbent_across_fidelities(model, tids, path):
             table_per_fid = dict()
             for f in fidelities:
                 table_per_fid[f] = table[table[fidelity_names[model]] == f]
-            val = [np.float32(res["function_value"]) for res in table_per_fid[full_budget].result]
+            val = [np.float32(res["function_value"]) for res in table_per_fid[full_budget].result.values]
             min_val = np.min(val)
+            # finding the first index of the best recorded loss
             min_idxs = np.where(val == min_val)[0]
 
+            # this loop finds the rank of the loss in the list of sorted loss for each of the idx
+            # or configuration that yielded the lowest loss
             for i, min_idx in enumerate(min_idxs):
                 print("{:<4}/{:<4}".format(i+1, len(min_idxs)), end='\r')
                 temp = []
                 for f in np.sort(fidelities):
-                    _val = [np.float32(res["function_value"]) for res in table_per_fid[f].result]
+                    _val = [np.float32(res["function_value"]) for res in table_per_fid[f].result.values]
+                    # `rankdata` assigns a rank to the data where ties are broken by average
                     temp.append(rankdata(_val)[min_idx])
+                # stores rank of the candidate best config (min_idxs) across the lower fidelities
                 ranks[seed].append(temp)
+            # each `ranks[seed]` result in a len(min_idxs) x len(fidelities) array
+            # the median rank is computed per fidelity for all the candidate best configs
             ranks[seed] = np.median(ranks[seed], axis=0)
         x = range(1, len(fidelities) + 1)
+        # dataframe containing the median rank of the candidate best configs at each fidelity level
+        # for each of the seed (As columns)
         df = pd.DataFrame(ranks)
         size = table_per_fid[full_budget].shape[0]
+        # absolute rank is converted to a percentile based on total grid size
         m = (size - df.transpose().median().values) / size
         max_area = 1 * (len(fidelities) - 1)
+        # AUC normalized to [0, 1]
         auc = calc_area_under_curve(m, 1) / max_area
-        # area above curve (AAC)
-        # aac = 1 - auc / max_area
         auc_list.append(auc)
         plt.clf()
         plt.plot(x, m, color="blue")
         plt.fill_between(x, 0, m, alpha=0.3, color="blue")
-        plt.fill_between(x, m, 1, alpha=0.6, color="red")
+        plt.fill_between(x, m, 1, alpha=0.75, color="red")
         plt.hlines(y=[1], xmin=1, xmax=len(fidelities), alpha=0.3, linestyles="--", color="gray")
         plt.vlines(x=x, ymin=0, ymax=1, alpha=0.3, linestyles="--", color="gray")
         plt.xticks(x, fidelities)
-        plt.ylim(0, 1.01)
-        plt.ylabel("%-tile rank of best configuration")
-        plt.xlabel("fidelity values")
-        plt.title("Rank across fidelities for {} on Task ID {}".format(model, tid))
-        plt.text(x=x[-2], y=0.60, s="AUC:\n{:.4f}".format(auc), fontdict={"fontsize": 20})
-        if tid in [168911, 168910, 9952, 168335, 168331, 9977]:
-            plt.savefig(os.path.join(path, "{}_{}.pdf".format(model, tid)), bbox_inches="tight")
-        else:
-            plt.savefig(os.path.join(path, "{}_{}.png".format(model, tid)), bbox_inches="tight")
+        plt.ylim(0, 1.0)
+        plt.xlim(1, len(fidelities))
+        print(fidelities.min(), fidelities.max())
+        plt.ylabel("%-tile rank of best configuration", fontsize=15)
+        plt.xlabel("fidelity values", fontsize=15)
+        plt.title("Rank across fidelities for {} on Task ID {}".format(model.upper(), tid), size=15)
+        plt.text(x=x[len(x)//2], y=0.10, s="AUC:\n{:.4f}".format(auc), fontdict={"fontsize": 25})
+        filename = "{{}}_{{}}.{}".format(format)
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_path, filename.format(model, tid)))
     plt.clf()
     plt.boxplot(auc_list)
-    plt.title("AUC distribution across datasets for {}".format(model))
-    plt.savefig(os.path.join(path, "{}.pdf".format(model)), bbox_inches="tight")
+    plt.title("AUC distribution across datasets for {}".format(model), size=30)
+    plt.tight_layout()
+    all_filename = "{{}}.{}".format(format)
+    plt.savefig(os.path.join(output_path, all_filename.format(model)))
+    return auc_list
 
 
 def cost_density_plot(table, model, task_id):
