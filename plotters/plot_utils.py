@@ -306,7 +306,7 @@ def line_box_corr_plot(plt, tids, fid_name, model, table_path, output_path, corr
     plt.boxplot(df.values)
     plt.xticks(range(1, df.shape[1]+1), df.columns)  #, rotation=30)
     plt.title("{} correlation of fidelities to full budget for {}".format(corr_type, model.upper()))
-    plt.savefig(os.path.join(path, "{}.pdf".format(model)), bbox_inches="tight")
+    plt.savefig(os.path.join(output_path, "{}.pdf".format(model)), bbox_inches="tight")
 
     def highlight_cell(x, y, ax=None, **kwargs):
         rect = plt.Rectangle((x - .5, y - .5), 1, 1, fill=False, **kwargs)
