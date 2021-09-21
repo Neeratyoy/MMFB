@@ -15,10 +15,7 @@ paper_tasks = [
 ]
 ntasks_done = dict(
     lr=20,
-    svm=20,
-    rf=20,
-    xgb=20,
-    nn=8
+    svm=20
 )
 
 

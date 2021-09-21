@@ -1,5 +1,8 @@
 import os
 import argparse
+
+import matplotlib.pyplot as plt
+
 from utils.util import dump_yaml_args
 from plotters.plot_utils import rank_incumbent_across_fidelities
 
@@ -15,6 +18,22 @@ ntasks_done = dict(
     xgb=20,
     nn=8
 )
+
+
+def collate_aucs():
+    dfs = []
+    for model in models:
+        yaml_path = Path(path) / model / "auc/{}_aucs.yaml".format(model)
+        _auc = load_yaml_args(yaml_path)
+        dfs.append(pd.DataFrame.from_dict(_auc, columns=["AUC"], orient="index"))
+    df = pd.concat(dfs, axis=1)
+    _models = [m.upper() for m in models]
+    df.columns = ["SVM", "LogReg", "RF", "XGB", "MLP"]
+    df = df.reindex(paper_tasks)
+    df.boxplot(grid=False, fontsize=20, rot=15)
+    plt.title("AUC score distribution across space", fontsize=20)
+    plt.tight_layout()
+    plt.savefig(Path(path) / "auc_boxplot.pdf")
 
 
 def input_arguments():
