@@ -139,7 +139,8 @@ if __name__ == "__main__":
     min_budget, max_budget = fidelity.lower, fidelity.upper
 
     dehb = DEHB(
-        cs=benchmark.original_cs, f=target_function, min_budget=min_budget, max_budget=max_budget, n_workers=1
+        cs=benchmark.original_cs, f=target_function, min_budget=min_budget, max_budget=max_budget,
+        n_workers=1, output_path="./dehb_output/"
     )
 
     fevals = 50
