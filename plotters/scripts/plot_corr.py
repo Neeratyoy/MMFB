@@ -61,6 +61,6 @@ if __name__ == "__main__":
         tids = paper_tasks[:ntasks_done[model]] if args.task_id is None else args.task_id
         plt.clf()
         plt = line_box_corr_plot(
-            plt, tids, fidelity_names[model], model, output_path, args.load_path
+            plt, tids, fidelity_names[model], model, args.load_path, output_path
         )
     print("Done!")
