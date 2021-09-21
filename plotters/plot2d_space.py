@@ -83,7 +83,7 @@ if __name__ == "__main__":
             labels = np.sort(benchmark.configuration_space.get_hyperparameter_names())
             plt.xlabel(labels[0], fontsize=20)
             plt.ylabel(labels[1], fontsize=20)
-            if args.space == "svm":
+            if model == "svm":
                 plt.xscale("log", base=2)
                 plt.yscale("log", base=2)
             else:
