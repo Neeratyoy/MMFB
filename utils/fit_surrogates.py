@@ -143,7 +143,7 @@ if __name__ == "__main__":
         n_workers=1, output_path="./dehb_output/"
     )
 
-    fevals = 50
+    fevals = args.fevals
     # Loss fitting
     train_X, train_y, valid_X, valid_y = create_splits(loss_df, val_size=0.1, seed=1)
     _ = dehb.run(
