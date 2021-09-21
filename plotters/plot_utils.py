@@ -19,7 +19,7 @@ fidelity_names = dict(
 )
 
 
-def load_benchmark(model, task_id, path="nemo_dump/{}/1/{}/{}/"):
+def load_benchmark(model, task_id, path="nemo_dump/TabularData"):
     """ Loads the parquet compressed tabular benchmark """
     benchmark = TabularBenchmark(data_dir=path, task_id=task_id, model=model)
     vals = [res["function_value"] for res in benchmark.table.result.values]
@@ -30,7 +30,7 @@ def load_benchmark(model, task_id, path="nemo_dump/{}/1/{}/{}/"):
     return benchmark, vals, per_seed
 
 
-def process_table(table, model, num_hps):
+def process_table(table, model, num_hps, num_fidels=0):
     """ Function that takes the mean of loss and sum of costs for only the full budget evaluations
     """
     # extracting only info of interest, loss and cost
@@ -48,7 +48,7 @@ def process_table(table, model, num_hps):
         loss += table[table.seed == seed].y.values
         costs += table[table.seed == seed].cost.values
     loss = loss / len(seeds)
-    final_table = table[table.seed == seed].iloc[:, :num_hps]
+    final_table = table[table.seed == seed].iloc[:, :(num_hps + num_fidels)]
     final_table["y"] = loss
     final_table["cost"] = costs
     return final_table
@@ -264,14 +264,14 @@ def get_fidelity_correlation(ax, table, fid_name, corr_type="kendall"):
     return ax
 
 
-def full_space_fidelity_correlation(tids, fid_name, model, corr_type="kendall"):
+def full_space_fidelity_correlation(tids, fid_name, model, corr_type="kendall", table_path=None):
     """ Computes correlation score for loss across fidelities """
     # stores a F x F correlation matrix for fidelity values per task_id
     model_space = dict()
     tids =[int(t) for t in tids]
     for tid in np.sort(tids):
         print(tid, end="\r")
-        benchmark, _, _ = load_benchmark(model, tid)
+        benchmark, _, _ = load_benchmark(model, tid, table_path)
         table = benchmark.table
         del benchmark
         fids = dict()
@@ -294,14 +294,18 @@ def full_space_fidelity_correlation(tids, fid_name, model, corr_type="kendall"):
     return df, model_space
 
 
-def line_box_corr_plot(plt, tids, fid_name, model, path, corr_type="kendall"):
-    """ Box-line plot for regret trend across datasets """
-    df, model_space = full_space_fidelity_correlation(tids, fid_name, model, corr_type)
+def line_box_corr_plot(plt, tids, fid_name, model, table_path, output_path, corr_type="kendall"):
+    """ Box-line plot for regret trend across datasets
+
+    Dumps correlation matrix for each dataset and a line-box plot for all datasets.
+    """
+    plt.rcParams["figure.figsize"] = (5, 5)
+    df, model_space = full_space_fidelity_correlation(tids, fid_name, model, corr_type, table_path)
     plt.clf()
     plt.plot(range(1, df.shape[1]+1), df.mean().values)
     plt.boxplot(df.values)
     plt.xticks(range(1, df.shape[1]+1), df.columns)  #, rotation=30)
-    plt.title("{} correlation of fidelities to full budget for {}".format(corr_type, model))
+    plt.title("{} correlation of fidelities to full budget for {}".format(corr_type, model.upper()))
     plt.savefig(os.path.join(path, "{}.pdf".format(model)), bbox_inches="tight")
 
     def highlight_cell(x, y, ax=None, **kwargs):
@@ -324,8 +328,8 @@ def line_box_corr_plot(plt, tids, fid_name, model, path, corr_type="kendall"):
         plt.colorbar(mat, label="{} correlation".format(corr_type))
         plt.xticks(range(nfidelities), fidelities)  #, rotation=15)
         plt.yticks(range(nfidelities), fidelities)
-        plt.title("{} on Task ID {}".format(model, k))
-        plt.savefig(os.path.join(path, "{}_{}.png".format(model, k)), bbox_inches="tight")
+        plt.title("{} on Task ID {}".format(model.upper(), k))
+        plt.savefig(os.path.join(output_path, "{}_{}.pdf".format(model, k)), bbox_inches="tight")
     return plt
 
 

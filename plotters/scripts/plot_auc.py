@@ -78,7 +78,6 @@ if __name__ == "__main__":
     args = input_arguments()
     models = list(ntasks_done.keys()) if args.model is None else args.model
     for model in models:
-        print(model)
         output_path = os.path.join(args.output_path, model, "auc")
         os.makedirs(output_path, exist_ok=True)
         tids = paper_tasks[:ntasks_done[model]] if args.task_id is None else args.task_id
