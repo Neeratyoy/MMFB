@@ -165,6 +165,7 @@ if __name__ == "__main__":
         # kwargs
         train_X=train_X, train_y=train_y, valid_X=valid_X, valid_y=valid_y, seed=1
     )
+    config = dehb.vector_to_configspace(dehb.inc_config)
     cost_model = RandomForestRegressor(**config.get_dictionary(), n_estimators=max_budget)
     cost_model.fit(loss_df.iloc[:, :-1], loss_df.iloc[:, -1])
     with open(output_path / "surr_cost_{}_{}.pkl".format(args.model, args.task_id), "wb") as f:
