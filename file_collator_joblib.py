@@ -96,6 +96,10 @@ def joblib_fn(filename, dump_path):
     except FileNotFoundError:
         # if file was collected with os.listdir but deleted in the meanwhile, ignore it
         return None
+    except EOFError:
+        # removing the file that is corrupted
+        os.remove(os.path.join(dump_path, filename))
+        return None
     task_id = int(filename.split('/')[0].split('_')[0])
     progress_id = int(filename.split('.pkl')[0].split('_')[-1])
     output = (task_id, progress_id, res)
@@ -160,7 +164,10 @@ if __name__ == "__main__":
     while True:
         task_datas = dict()
         # list available tasks
-        task_ids = [int(tid) for tid in os.listdir(dump_path)]
+        task_ids = [
+            int(tid) for tid in os.listdir(dump_path)
+            if len(os.listdir(os.path.join(dump_path, tid))) > 0
+        ]
         if len(task_ids) == 0:
             continue
         batch_size = args.max_batch_size // len(task_ids)
