@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     global_mins = dict(val=dict(), test=dict())
     for m in metrics.keys():
-        for split in splits:
+        for split in splits:  # train, val, test
             split_key = "{}_scores".format(split)
             colname = "{}_{}".format(m, split_key)
             param_names.remove(colname)

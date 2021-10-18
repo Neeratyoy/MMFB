@@ -155,6 +155,24 @@ def generate_SH_fidelities(
     return budgets
 
 
+def generate_HB_fidelities(
+        min_budget: Union[int, float], max_budget: Union[int, float], eta: int = 3,
+        hb_brackets: int = 1
+) -> np.ndarray:
+    """ Returns the total number of configurations evaluated per budget for the HB parameters
+    """
+    max_SH_iter = -int(np.log(min_budget / max_budget) / np.log(eta)) + 1
+    budgets = max_budget * np.power(eta, -np.linspace(start=max_SH_iter-1, stop=0, num=max_SH_iter))
+    hb_map = {int(budget): 0 for budget in budgets}
+    for i in range(max_SH_iter * hb_brackets):
+        s = max_SH_iter - 1 - (i % max_SH_iter)
+        n0 = int(np.floor((max_SH_iter) / (s + 1)) * eta ** s)
+        ns = [max(int(n0 * (eta ** (-i))), 1) for i in range(s + 1)]
+        for j, budget in enumerate(budgets[(-s-1):]):
+            hb_map[int(budget)] += ns[j]
+    return hb_map
+
+
 def get_parameter_grid(
         cs: CS.ConfigurationSpace,
         grid_step_size: int = 10,

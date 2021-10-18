@@ -23,6 +23,24 @@ def find_global_maximum(table, model):
     return global_maximum
 
 
+def find_global_minimum(table, model, split="val"):
+    assert split in ["val", "test"]
+    full_budget = table[fidelity_names[model]].values.max()
+    table = table[table[fidelity_names[model]] == full_budget]
+    table_per_seed = dict()
+    vals_per_seed = []
+    seeds = np.unique(table.seed.values)
+    for seed in seeds:
+        table_per_seed[seed] = table[table.seed == seed]
+        key = "{}_scores".format(split)
+        # table_per_seed[seed].result =
+        vals_per_seed.append(np.array([
+            1 - res["info"][key]["acc"] for res in table_per_seed[seed].result.values
+        ]))
+    global_minimum = float(np.array(vals_per_seed).mean(axis=0).min())
+    return global_minimum
+
+
 def update_dict_entry(key, path):
     model, task_id = key.split("_")
     task_id = int(task_id)

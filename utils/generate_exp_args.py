@@ -1,3 +1,7 @@
+"""
+Script to update exp yaml args with optimization budget
+"""
+
 import os
 import argparse
 import numpy as np
@@ -6,7 +10,7 @@ import pandas as pd
 from plotters.plot_utils import fidelity_names
 from run_benchmark_dask import param_space_dict
 from utils.test_benchmark_compress import json_compatible_dict
-from utils.util import all_task_ids_by_in_mem_size, dump_yaml_args
+from utils.util import all_task_ids_by_in_mem_size, dump_yaml_args, generate_HB_fidelities
 
 from hpobench.benchmarks.ml import TabularBenchmark
 
@@ -87,6 +91,12 @@ def input_arguments():
         help="Minimum runtime to cap to"
     )
     parser.add_argument(
+        "--hb_brackets",
+        default=1,
+        type=int,
+        help="Number of HB brackets to compute optimization budget over"
+    )
+    parser.add_argument(
         "--raw",
         default=False,
         action="store_true",
@@ -106,27 +116,56 @@ if __name__ == "__main__":
         _path = os.path.join(args.path, args.model)
         args.task_id = os.listdir(_path)
         args.task_id = [int(tid) for tid in args.task_id if os.path.isdir(os.path.join(_path, tid))]
+
+    if args.nsamples is not None:
+        raise NotImplementedError("No logic to handle nsamples. `hb_brackets` calculates budget!")
+
+    # iterating over benchmarks
     for count, task_id in enumerate(np.sort(args.task_id), start=1):
         # print(task_id, end="\r")
         benchmark = TabularBenchmark(
             data_dir=args.path, model=args.model, task_id=task_id
         )
-        costs = []
-        full_budget = benchmark.table[fidelity_names[args.model]].values.max()
-        table = benchmark.table[benchmark.table[fidelity_names[args.model]] == full_budget]
+        table = benchmark.table.copy()
+        seeds = benchmark.table.seed.unique()
+        min_budget = benchmark.original_fs.get_hyperparameter(fidelity_names[args.model]).lower
+        max_budget = benchmark.original_fs.get_hyperparameter(fidelity_names[args.model]).upper
         del benchmark
-        table_per_seed = dict()
-        cost_per_seed = dict()
-        seeds = np.unique(table.seed.values)
-        for seed in seeds:
-            table_per_seed[seed] = table[table.seed == seed]
-            cost_per_seed[seed] = [res["cost"] for res in table_per_seed[seed].result.values]
+        # subsetting per fidelity
+        fidelity = fidelity_names[args.model]
+        budgets = table[fidelity].unique()
+        table_per_budget = {budget: table[table[fidelity] == budget] for budget in budgets}
         del table
-        # Summing cost across seeds
-        cost_df = pd.DataFrame(cost_per_seed).sum(axis=1)
-        # Averaging costs across all configs
-        mean_cost = cost_df.mean()
-        time_limit_in_s = np.max((np.ceil(mean_cost * args.nsamples), args.min_runtime))
+        # calculating average cost per fidelity
+        cost_per_budget = dict()
+        for budget in budgets:
+            # subsetting table per seed for each config-fidelity
+            cost_per_seed = {
+                seed: table_per_budget[budget][
+                    table_per_budget[budget].seed == seed
+                ] for seed in seeds
+            }
+            cost_per_seed = {
+                seed: [res["cost"] for res in cost_per_seed[seed].result] for seed in seeds
+            }
+            # `cost_per_seed` contains the cost of each config-fidelity per seed
+            # sum of these costs across seeds will be considered as cost for each config-fidelity
+            costs = np.zeros(len(cost_per_seed[seeds[0]]))
+            for seed in seeds:
+                costs += cost_per_seed[seed]
+            # `costs` is a list of costs per config-fidelity, summed over all seeds for a budget
+            # computing average cost of a config-fidelity for this budget
+            print(budget, min(costs), max(costs))
+            cost_per_budget[budget] = np.mean(costs)
+        # calculating number of configs evaluated per fidelity for an HB bracket
+        hb_map = generate_HB_fidelities(
+            min_budget=min_budget, max_budget=max_budget, eta=3, hb_brackets=args.hb_brackets
+        )
+        # computing optimization budget cost for specified HB brackets
+        time_limit_in_s = np.max((
+            np.sum([cost_per_budget[budget] * hb_map[budget] for budget in budgets]),
+            args.min_runtime
+        ))
         if args.max_runtime is not None:
             time_limit_in_s = np.min((time_limit_in_s, args.max_runtime))
         print("{:<2}. Task ID {}: {} seconds -- {}".format(
