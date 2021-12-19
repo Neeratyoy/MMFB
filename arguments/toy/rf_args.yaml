@@ -4,12 +4,13 @@ x_grid_size: 3
 z_grid_size: 0
 include_SH: True
 fidelity_choice: 1
+retain_true: True
 n_seeds: 3
 data_path: "./tmp_dump/openml_splits"
 output_path: "./tmp_dump"
-n_workers: null
+n_workers: 4
 task_id: null
-scheduler_file: "./tmp_dump/scheduler.json"
+scheduler_file: null
 seed: 1234
 exp_name: "test"
 restart_id: 0

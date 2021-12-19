@@ -5,7 +5,6 @@ import warnings
 import argparse
 from typing import Dict
 from loguru import logger
-from distributed import Lock
 
 from hpobench.benchmarks.ml import *
 
@@ -21,6 +20,9 @@ _logger_props = {
 }
 
 param_space_dict = dict(
+    # 0 corresponds to the complete multi-multi-fidelity benchmark
+    # 1 corresponds to the multi-fidelity benchmark using a single fidelity variable
+    # 2 corresponds to the black-box benchmark using a no fidelities or full fidelities
     lr={0: LRBenchmark, 1: LRBenchmarkMF, 2: LRBenchmarkBB},
     rf={0: RandomForestBenchmark, 1: RandomForestBenchmarkMF, 2: RandomForestBenchmarkBB},
     nn={0: NNBenchmark, 1: NNBenchmarkMF, 2: NNBenchmarkBB},
@@ -45,22 +47,19 @@ def return_dict(combination: Tuple) -> Dict:
     evaluation["seed"] = combination[3]
     evaluation["path"] = combination[4]
     evaluation["data_path"] = combination[5]
-    evaluation["fidelity_choice"] = combination[6]
+    evaluation["record_train"] = combination[6]
     evaluation["id"] = combination[7]
     evaluation["space"] = combination[8]
     return evaluation
 
 
-def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
+def compute(evaluation: dict) -> str:
     """ Function to evaluate a configuration-fidelity on a task for a seed
 
     Parameters
     ----------
     evaluation : dict
-        5-element dictionary containing all information required to perform a run
-    benchmarks : dict
-        a nested dictionary of the hierarchy task_id-seeds containing instantiations of the
-        benchmarks for each task_id - seed pair that is shared across all Dask workers
+        multi-element dictionary containing all information required to perform a run
 
     Returns
     -------
@@ -85,7 +84,7 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         if os.path.isdir(tmp_path):
             data_path = tmp_path
     print("Data path: ", data_path)
-    fidelity_choice = evaluation["fidelity_choice"]
+    record_train = evaluation["record_train"]
     i = evaluation["id"]
     model_space = evaluation["space"]
     task_path = os.path.join(path, str(task_id))
@@ -97,18 +96,18 @@ def compute(evaluation: dict):  #  , benchmarks: dict=None) -> str:
         rng=seed,
         data_path=data_path
     )
-    if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
-        # load splits from specified path
-        benchmark.train_X, \
-        benchmark.train_y, \
-        benchmark.valid_X, \
-        benchmark.valid_y, \
-        benchmark.test_X, \
-        benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
+    # if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
+    #     # load splits from specified path
+    #     benchmark.train_X, \
+    #     benchmark.train_y, \
+    #     benchmark.valid_X, \
+    #     benchmark.valid_y, \
+    #     benchmark.test_X, \    # TODO: record_train variable
+    #     benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
     # the lookup dict key for each evaluation is a 4-element tuple
     end1 = time.time()
     print("Time to load: {:.5f}".format(end1 - start))
-    result = benchmark.objective_function(config, fidelity)
+    result = benchmark.objective_function(config, fidelity, rng=seed, record_train=record_train)
     print("Time to evaluate: {:.5f}".format(time.time() - end1))
     result['info']['seed'] = seed
     # file_collator should collect the pickle files dumped below
@@ -178,14 +177,19 @@ def input_arguments():
         default=0,
         type=int,
         help="Choice of fidelity space:\n"
-             "0 : the black-box setup with max. fidelites (n_estimators=100; subsample=1\n"
-             "1 : n_estimators as fidelity with dataset subset fraction fixed (subsample=1)\n"
-             "2 : subsample as fidelity with number of trees fixed (n_estimators=100)\n"
-             ">2: Both number of trees (n_estimators) and dataset subset fraction (subsample)"
+             "0 : the multi-multi-fidelity version\n"
+             "1 : the multi-fidelity version using only one fidelity variable\n"
+             "2 : the black-box version\n"
+    )
+    parser.add_argument(
+        "--record_train",
+        default=False,
+        action="store_true",
+        help="If True, records the evaluation statistics on the training set."
     )
     parser.add_argument(
         "--n_seeds",
-        default=3,
+        default=5,
         type=int,
         help="The number of different seeds to evaluate each configuration-fidelity on."
     )
@@ -211,7 +215,7 @@ def input_arguments():
         "--seed",
         default=1234,
         type=int,
-        help="The seed for the complete benchmark collection"
+        help="The seed for the complete benchmark collection runs"
     )
     parser.add_argument(
         "--exp_name",
@@ -320,7 +324,9 @@ if __name__ == "__main__":
     # Retrieving observation space and populating grid
     configuration_space = benchmark.configuration_space
     logger.info("Populating grid for observation space...")
-    grid_config = get_parameter_grid(configuration_space, args.x_grid_size, convert_to_configspace=False)
+    grid_config = get_parameter_grid(
+        configuration_space, args.x_grid_size, convert_to_configspace=False
+    )
     logger.info("{} unique observations generated".format(len(grid_config)))
     logger.debug("Observation space grid size: {:.2f} MB".format(obj_size(grid_config)))
 
@@ -328,19 +334,18 @@ if __name__ == "__main__":
     fidelity_space = benchmark.fidelity_space
     logger.info("Populating grid for fidelity space...")
     grid_fidelity = get_fidelity_grid(
-        fidelity_space, args.z_grid_size, convert_to_configspace=False, include_sh_budgets=args.include_SH
+        fidelity_space, args.z_grid_size,
+        convert_to_configspace=False, include_sh_budgets=args.include_SH
     )
     logger.info("{} unique fidelity configurations generated".format(len(grid_fidelity)))
     logger.debug("Fidelity space grid size: {:.2f} MB".format(obj_size(grid_fidelity)))
 
     # Dask initialisation
-    lock = None
     if args.scheduler_file is not None and os.path.isfile(args.scheduler_file):
         logger.info("Connecting to scheduler...")
         client = Client(scheduler_file=args.scheduler_file)
         client = DaskHelper(client=client)
         num_workers = client.n_workers
-        # client.distribute_data_to_workers(benchmarks)
         logger.info("Dask Client information: {}".format(client.client))
     else:
         num_workers = args.n_workers
@@ -348,11 +353,11 @@ if __name__ == "__main__":
         if num_workers > 1:
             logger.info("Creating Dask client...")
             client = DaskHelper(n_workers=args.n_workers)
-            # Essential step:
-            # More than speeding up data management by Dask, creating the benchmark class objects
-            # once and sharing it across all the workers mean that for each task-seed instance,
-            # the validation split remains the same across evaluations
-            # client.distribute_data_to_workers(benchmarks)
+    #         # Essential step:
+    #         # More than speeding up data management by Dask, creating the benchmark class objects
+    #         # once and sharing it across all the workers mean that for each task-seed instance,
+    #         # the validation split remains the same across evaluations
+    #         # client.distribute_data_to_workers(benchmarks)
             logger.info("Dask Client information: {}".format(client.client))
     logger.info("Executing with {} worker(s)".format(num_workers))
 
@@ -380,7 +385,7 @@ if __name__ == "__main__":
         combination[1] = map_to_config(configuration_space, combination[1])
         combination[2] = map_to_config(fidelity_space, combination[2])
         combination.append(args.data_path)
-        combination.append(args.fidelity_choice)
+        combination.append(args.record_train)
         combination.append(i)
         combination.append(param_space)
         if num_workers == 1:
@@ -389,13 +394,10 @@ if __name__ == "__main__":
         # for a combination selected, need to wait until it is submitted to a worker
         # client.submit_job() is an asynchronous call, followed by a break which allows the
         # next combination to be submitted if client.is_worker_available() is True
-        wait_count = 0
         while True:
+            # returns a list of available workers and their addresses
             workers = client.is_worker_available()
             if workers:
-                # client.distribute_data_to_workers(benchmarks)
-                # benchmarks should be provided as a second argument to compute() by dask as
-                # the benchmarks are already distributed across the workers
                 logger.debug("Available worker count: {}".format(len(workers)))
                 client.submit_job(compute, return_dict(combination), workers)
                 # sleep allows a job to be submitted to a worker such that the next round of
@@ -403,7 +405,6 @@ if __name__ == "__main__":
                 time.sleep(0.05)  # 50 milliseconds
                 break
             else:
-                wait_count += 1
                 time.sleep(0.1)  # wait for 100 milliseconds before querying for futures
                 client.fetch_futures(retries=1, wait_time=0.0)
     if num_workers > 1 and client.is_worker_alive():
