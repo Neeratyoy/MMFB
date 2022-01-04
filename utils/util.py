@@ -38,6 +38,11 @@ all_task_ids_by_in_mem_size = [
     # 189356  # MemoryError: Unable to allocate 1.50 TiB; array size (256419, 802853) of type float64
 ]
 
+paper_tasks = [
+    10101, 53, 146818, 146821, 9952, 146822, 31, 3917, 168912, 3, 167119, 12, 146212, 168911,
+    9981, 167120, 14965, 146606, 7592, 9977
+]
+
 
 def obj_size(obj):
     """ Returns size in MB
