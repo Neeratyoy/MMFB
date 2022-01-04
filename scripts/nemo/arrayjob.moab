@@ -3,13 +3,13 @@
 #MSUB -l nodes=1:ppn=20
 #MSUB -l walltime=95:00:00
 #MSUB -N mmfb-workers
-#MSUB -o /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
-#MSUB -e /work/ws/nemo/fr_nm217-hpobench-0/msub-logs
+#MSUB -o /work/ws/nemo/fr_nm1068-hpobench-0/msub-logs
+#MSUB -e /work/ws/nemo/fr_nm1068-hpobench-0/msub-logs
 
 nworkers=20
 
 codedir=$HOME'/Thesis/code/MMFB'
-wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
+wspace='/work/ws/nemo/fr_nm1068-hpobench-0/'
 
 source $HOME/miniconda3/bin/activate mmfb
 

@@ -1,9 +1,10 @@
+"""
+Script that edits run_collator.sh dynamically to have relevant parameters and job names
+"""
+
 import os
-import time
 import argparse
 import subprocess
-
-from utils.util import all_task_ids_by_in_mem_size
 
 
 def edit_submit_script(codedir, space, fidelity=1, sleep=None):
