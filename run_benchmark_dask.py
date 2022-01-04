@@ -96,14 +96,6 @@ def compute(evaluation: dict) -> str:
         rng=seed,
         data_path=data_path
     )
-    # if benchmark.data_path is not None and os.path.isdir(benchmark.data_path):
-    #     # load splits from specified path
-    #     benchmark.train_X, \
-    #     benchmark.train_y, \
-    #     benchmark.valid_X, \
-    #     benchmark.valid_y, \
-    #     benchmark.test_X, \    # TODO: record_train variable
-    #     benchmark.test_y = read_openml_splits(task_id, benchmark.data_path)
     # the lookup dict key for each evaluation is a 4-element tuple
     end1 = time.time()
     print("Time to load: {:.5f}".format(end1 - start))

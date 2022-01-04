@@ -13,4 +13,5 @@ scheduler_file: "/work/ws/nemo/fr_nm1068-hpobench-0/scheduler/scheduler_xgb.json
 seed: 1234
 exp_name: null
 restart_id: 0
+record_train: True
 missing: "/work/ws/nemo/fr_nm1068-hpobench-0/full/xgb/1/benchmark/xgb_10101_missing.txt"
