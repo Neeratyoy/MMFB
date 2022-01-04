@@ -31,7 +31,7 @@ def input_args():
     parser.add_argument("--space", default=None, type=str)
     parser.add_argument("--fidelity", default=1, type=int, choices=[0, 1, 2, 3])
     parser.add_argument("--sleep", default=None, type=int)
-    parser.add_argument("--codedir", default="/home/fr/fr_fr/fr_nm217/Thesis/code/MMFB", type=str)
+    parser.add_argument("--codedir", default="/home/fr/fr_fr/fr_nm1068/Thesis/code/MMFB", type=str)
     args = parser.parse_args()
     return args
 
