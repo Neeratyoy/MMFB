@@ -110,6 +110,7 @@ def compute(evaluation: dict) -> str:
     name = "{}/{}_{}_{}_{}_{}.pkl".format(task_path, task_id, config_hash, fidelity_hash, seed, i)
     with open(name, 'wb') as f:
         pickle.dump(result, f)
+    print("Saved at {}".format(task_path))
     return "success"
 
 
