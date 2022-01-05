@@ -99,7 +99,11 @@ def compute(evaluation: dict) -> str:
     # the lookup dict key for each evaluation is a 4-element tuple
     end1 = time.time()
     print("Time to load: {:.5f}".format(end1 - start))
-    result = benchmark.objective_function(config, fidelity, rng=seed, record_train=record_train)
+    # setting `rng=None` to the objective call ensures the random state passed during the benchmark
+    # instantiation is used during the ML model instantiation too
+    result = benchmark.objective_function(
+        config, fidelity, rng=None, record_train=record_train, get_learning_curve=True
+    )
     print("Time to evaluate: {:.5f}".format(time.time() - end1))
     result['info']['seed'] = seed
     # file_collator should collect the pickle files dumped below

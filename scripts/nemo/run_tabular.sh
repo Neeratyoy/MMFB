@@ -5,7 +5,7 @@ runtype=$2
 taskid=$3
 
 codedir=$HOME'/Thesis/code/MMFB'
-wspace='/work/ws/nemo/fr_nm217-hpobench-0/'
+wspace='/work/ws/nemo/fr_nm1068-hpobench-0/'
 
 config=$codedir"/arguments/nemo/"$runtype/$model"/args_"$taskid".yaml"
 
