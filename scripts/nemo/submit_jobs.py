@@ -39,7 +39,7 @@ def input_args():
     parser.add_argument("--tasks", default=None, nargs="+", type=int)
     parser.add_argument("--space", default=None, type=str)
     parser.add_argument("--exp_type", default="full", type=str, choices=["full", "toy"])
-    parser.add_argument("--codedir", default="/home/fr/fr_fr/fr_nm217/Thesis/code/MMFB", type=str)
+    parser.add_argument("--codedir", default="/home/fr/fr_fr/fr_nm1068/Thesis/code/MMFB", type=str)
     parser.add_argument("--sleep", default=5, type=float)
     parser.add_argument("--scheduler", default=None, type=str, help="scheduler file name")
     args = parser.parse_args()
