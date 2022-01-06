@@ -7,7 +7,7 @@ n_seeds: 5
 n_tasks: null
 n_workers: null
 output_path: /work/ws/nemo/fr_nm1068-hpobench-0/
-record_train: false
+record_train: true
 restart_id: 0
 scheduler_file: /work/ws/nemo/fr_nm1068-hpobench-0/scheduler/scheduler_svm.json
 seed: 1234

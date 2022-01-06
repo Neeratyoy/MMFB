@@ -335,7 +335,7 @@ def dump_yaml_args(args, filename):
 
 
 def arg_yaml_all_task(space, dest="nemo", exp_type="toy"):
-    """ Function to generate yaml files per task per benchmark given a template
+    """ Function to generate yaml files per task per benchmark given a base arguments yaml file
     """
     args = load_yaml_args(os.path.join("arguments", dest, exp_type, "{}_args.yaml".format(space)))
     args.n_tasks = None
