@@ -10,6 +10,9 @@ cores=$2
 #path="nemo_dump/TabularData/"$model"/"$fidelity"/benchmark/"
 path="/work/ws/nemo/fr_nm1068-hpobench-0/full/"$model/$fidelity"/benchmark/"
 
+codedir=$HOME'/Thesis/code/MMFB'
+export PYTHONPATH=$codedir:$PYTHONPATH
+
 for tid in "${tids[@]}"
 do
     echo "Task ID: "$tid
