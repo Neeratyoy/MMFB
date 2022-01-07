@@ -14,4 +14,5 @@ seed: 1234
 exp_name: null
 restart_id: 0
 record_train: True
+record_lcs: False
 missing: "/work/ws/nemo/fr_nm1068-hpobench-0/full/xgb/1/benchmark/xgb_10101_missing.txt"
