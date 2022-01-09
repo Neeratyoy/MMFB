@@ -52,7 +52,7 @@ def return_dict(combination: Tuple) -> Dict:
     evaluation["record_train"] = combination[6]
     evaluation["record_lcs"] = combination[7]
     evaluation["lc_every_k"] = combination[8]
-    evaluation["i"] = combination[9]
+    evaluation["id"] = combination[9]
     evaluation["space"] = combination[10]
     return evaluation
 
