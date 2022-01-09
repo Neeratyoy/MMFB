@@ -41,7 +41,7 @@ def config2hash(config):
 def return_dict(combination: Tuple) -> Dict:
     """ Converts a tuple to a dict that is recognizable by the function submitted to the workers
     """
-    assert len(combination) == 10
+    assert len(combination) == 11
     evaluation = dict()
     evaluation["task_id"] = combination[0]
     evaluation["config"] = combination[1]
