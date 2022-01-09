@@ -51,8 +51,9 @@ def return_dict(combination: Tuple) -> Dict:
     evaluation["data_path"] = combination[5]
     evaluation["record_train"] = combination[6]
     evaluation["record_lcs"] = combination[7]
-    evaluation["id"] = combination[8]
-    evaluation["space"] = combination[9]
+    evaluation["record_lcs"] = combination[8]
+    evaluation["lc_every_k"] = combination[9]
+    evaluation["space"] = combination[10]
     return evaluation
 
 
@@ -89,6 +90,7 @@ def compute(evaluation: dict) -> str:
     print("Data path: ", data_path)
     record_train = evaluation["record_train"]
     record_lcs = evaluation["record_lcs"]
+    lc_every_k = evaluation["lc_every_k"]
     i = evaluation["id"]
     model_space = evaluation["space"]
     task_path = os.path.join(path, str(task_id))
@@ -106,7 +108,8 @@ def compute(evaluation: dict) -> str:
     # setting `rng=None` to the objective call ensures the random state passed during the benchmark
     # instantiation is used during the ML model instantiation too
     result = benchmark.objective_function(
-        config, fidelity, rng=None, record_train=record_train, get_learning_curve=record_lcs
+        config, fidelity, rng=None, record_train=record_train,
+        get_learning_curve=record_lcs, lc_every_k=lc_every_k
     )
     print("Time to evaluate: {:.5f}".format(time.time() - end1))
     result['info']['seed'] = seed
@@ -193,6 +196,12 @@ def input_arguments():
         default=False,
         action="store_true",
         help="If True, records the learning curves on the validation and test sets."
+    )
+    parser.add_argument(
+        "--lc_every_k",
+        default=1,
+        type=int,
+        help="The number of iterations after which evaluations will be recorded for LCs."
     )
     parser.add_argument(
         "--n_seeds",
@@ -394,6 +403,7 @@ if __name__ == "__main__":
         combination.append(args.data_path)
         combination.append(args.record_train)
         combination.append(args.record_lcs)
+        combination.append(args.lc_every_k)
         combination.append(i)
         combination.append(param_space)
         if num_workers == 1:

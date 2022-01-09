@@ -15,4 +15,5 @@ exp_name: null
 restart_id: 0
 record_train: True
 record_lcs: False
+lc_every_k: 3
 missing: "/work/ws/nemo/fr_nm1068-hpobench-0/full/nn/1/benchmark/nn_10101_missing.txt"
