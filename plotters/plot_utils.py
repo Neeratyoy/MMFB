@@ -9,14 +9,7 @@ from scipy.stats import pearsonr, spearmanr, kendalltau, rankdata
 from run_benchmark_dask import param_space_dict
 from hpobench.benchmarks.ml import TabularBenchmark
 
-
-fidelity_names = dict(
-    rf="n_estimators",
-    lr="iter",
-    xgb="n_estimators",
-    svm="subsample",
-    nn="iter"
-)
+from utils.util import fidelity_names
 
 
 def load_benchmark(model, task_id, path="nemo_dump/TabularData"):

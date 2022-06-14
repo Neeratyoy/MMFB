@@ -51,6 +51,14 @@ ntasks_done = dict(
     nn=10
 )
 
+fidelity_names = dict(
+    rf="n_estimators",
+    lr="iter",
+    xgb="n_estimators",
+    svm="subsample",
+    nn="iter"
+)
+
 
 def tasks_available(model):
     return paper_tasks[:ntasks_done[model]]

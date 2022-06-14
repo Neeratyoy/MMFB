@@ -28,7 +28,6 @@ param_space_dict = dict(
     nn={0: NNBenchmark, 1: NNBenchmarkMF, 2: NNBenchmarkBB},
     svm={0: SVMBenchmark, 1: SVMBenchmarkMF, 2: SVMBenchmarkBB},
     xgb={0: XGBoostBenchmark, 1: XGBoostBenchmarkMF, 2: XGBoostBenchmarkBB},
-    histgb={0: HistGBBenchmark, 1: HistGBBenchmarkMF, 2: HistGBBenchmarkBB},
 )
 
 
