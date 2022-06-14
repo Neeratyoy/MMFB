@@ -5,6 +5,8 @@ Script to print latex table collecting Task IDs used and the #obs, #feat and Ope
 import openml
 import pandas as pd
 
+from utils.util import paper_tasks
+
 
 all_task_ids_by_in_mem_size = [
     10101, 53, 146818, 146821, 9952, 146822, 31, 3917, 168912, 3, 167119, 12, 146212, 168911,
@@ -16,11 +18,6 @@ all_task_ids_by_in_mem_size = [
     3945,  # >20k MB
     # 189356  # MemoryError: Unable to allocate 1.50 TiB; array size (256419, 802853) of type float64
 ]
-paper_tasks = [
-    10101, 53, 146818, 146821, 9952, 146822, 31, 3917, 168912, 3, 167119, 12, 146212, 168911,
-    9981, 167120, 14965, 146606, 7592, 9977
-]
-
 
 if __name__ == "__main__":
     # essential step to print full string width with URL for easy, correct, copy-paste
